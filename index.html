@@ -256,6 +256,10 @@ const mini = mkCanvas(MM, MM);
 
 // ===================== Sound =====================
 let actx = null, master = null, muted = false;
+// Lautstärken 0..1, im Browser gemerkt
+const snd = { master: 0.8, engine: 1, fx: 1 };
+try { Object.assign(snd, JSON.parse(localStorage.getItem('kart.sound') || '{}')); muted = !!snd.muted; } catch (e) {}
+function saveSound() { try { localStorage.setItem('kart.sound', JSON.stringify({ ...snd, muted })); } catch (e) {} }
 let engSrc = null, engFilter = null, engGain = null, hissGain = null, subOsc = null, rpm = 0;
 const ENG_BASE = 40; // Grundfrequenz (Zündungen pro Sekunde) des Motor-Samples
 
@@ -308,10 +312,10 @@ function initAudio() {
   } catch (e) { actx = null; }
 }
 function beep(freq, dur, type = 'square', vol = 0.08) {
-  if (!actx || muted) return;
+  if (!actx || muted || snd.fx <= 0) return;
   const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime;
   o.type = type; o.frequency.value = freq;
-  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  g.gain.setValueAtTime(vol * snd.fx, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
   o.connect(g).connect(master); o.start(); o.stop(t + dur);
 }
 
@@ -330,9 +334,9 @@ function updateEngineSound(dt) {
   engSrc.playbackRate.setTargetAtTime(fire / ENG_BASE, t, 0.03);
   subOsc.frequency.setTargetAtTime(fire, t, 0.03);
   engFilter.frequency.setTargetAtTime(220 + rpm * 0.06 + thr * 350, t, 0.05);
-  engGain.gain.setTargetAtTime(active ? 0.1 + 0.06 * thr + 0.05 * load : 0, t, active ? 0.05 : 0.4);
-  hissGain.gain.setTargetAtTime(active ? 0.002 + 0.006 * load * (0.4 + thr) : 0, t, 0.1);
-  master.gain.setTargetAtTime(muted ? 0 : 0.8, t, 0.02);
+  engGain.gain.setTargetAtTime(active ? (0.1 + 0.06 * thr + 0.05 * load) * snd.engine : 0, t, active ? 0.05 : 0.4);
+  hissGain.gain.setTargetAtTime(active ? (0.002 + 0.006 * load * (0.4 + thr)) * snd.engine : 0, t, 0.1);
+  master.gain.setTargetAtTime(muted ? 0 : snd.master, t, 0.02);
 }
 
 // ===================== Spielzustand =====================
@@ -534,9 +538,42 @@ function editName(e) {
   }
   return false;
 }
+// Ton-Optionen: TAB öffnet/schließt, ↑↓ wählen, ←→ ändern
+let optionsOpen = false, optSel = 0, pausedByOptions = false;
+const OPTIONS = [
+  { label: 'Gesamtlautstärke', key: 'master' },
+  { label: 'Motor', key: 'engine' },
+  { label: 'Effekte', key: 'fx' },
+  { label: 'Ton', key: 'mute' },
+];
+function toggleOptions() {
+  optionsOpen = !optionsOpen;
+  if (optionsOpen && !paused && soloRace() && (state === 'race' || state === 'countdown')) { paused = true; pausedByOptions = true; }
+  if (!optionsOpen && pausedByOptions) { paused = false; pausedByOptions = false; }
+}
+function optionsKey(e) {
+  const o = OPTIONS[optSel];
+  if (e.code === 'ArrowUp' || e.code === 'KeyW') optSel = (optSel + OPTIONS.length - 1) % OPTIONS.length;
+  else if (e.code === 'ArrowDown' || e.code === 'KeyS') optSel = (optSel + 1) % OPTIONS.length;
+  else if (['ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD', 'Enter', 'Space'].includes(e.code)) {
+    const dir = e.code === 'ArrowLeft' || e.code === 'KeyA' ? -1 : 1;
+    if (o.key === 'mute') muted = !muted;
+    else {
+      snd[o.key] = Math.round(clamp(snd[o.key] + dir * 0.1, 0, 1) * 10) / 10;
+      if (o.key === 'master' && muted && dir > 0) muted = false;
+    }
+    initAudio(); if (actx && actx.state === 'suspended') actx.resume();
+    if (o.key !== 'engine') beep(660, 0.12, 'triangle', 0.08); // Hörprobe
+    saveSound();
+  } else if (e.code === 'KeyM') { muted = !muted; saveSound(); }
+  else if (e.code === 'Escape') toggleOptions();
+}
+
 addEventListener('keydown', e => {
   keys[e.code] = true;
-  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Backspace'].includes(e.code)) e.preventDefault();
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Backspace', 'Tab'].includes(e.code)) e.preventDefault();
+  if (e.code === 'Tab' && !e.repeat) { toggleOptions(); return; }
+  if (optionsOpen) { optionsKey(e); return; }
   if (state === 'menu' && editName(e)) return;
   if (e.repeat) return;
   if (e.code === 'Enter') {
@@ -545,12 +582,13 @@ addEventListener('keydown', e => {
   }
   if ((e.code === 'KeyP' || e.code === 'Escape') && soloRace() && (state === 'race' || state === 'countdown')) paused = !paused;
   if (e.code === 'KeyR' && state !== 'menu' && soloRace() && amHost()) hostStart();
-  if (e.code === 'KeyM' && state !== 'menu') muted = !muted;
+  if (e.code === 'KeyM' && state !== 'menu') { muted = !muted; saveSound(); }
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 
 function playerInput() {
+  if (optionsOpen) return { gas: false, brake: false, steer: 0, drift: false };
   return {
     gas: !!(keys.ArrowUp || keys.KeyW),
     brake: !!(keys.ArrowDown || keys.KeyS),
@@ -822,13 +860,36 @@ function txt(s, x, y, size, align = 'left', fill = '#fff') {
 }
 
 function drawHud() {
+  drawScreens();
+  if (optionsOpen) drawOptions();
+}
+
+function drawOptions() {
+  const bw = 620, bh = 360, bx = (OW - bw) / 2, by = (OH - bh) / 2;
+  ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(0, 0, OW, OH);
+  ctx.fillStyle = 'rgba(16,22,34,.95)'; ctx.fillRect(bx, by, bw, bh);
+  ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 3; ctx.strokeRect(bx, by, bw, bh);
+  txt('TON-OPTIONEN', OW / 2, by + 60, 48, 'center', '#ffd23f');
+  OPTIONS.forEach((o, i) => {
+    const y = by + 125 + i * 56, sel = i === optSel, col = sel ? '#ffe9a0' : '#fff';
+    txt((sel ? '▶ ' : '   ') + o.label, bx + 40, y, 30, 'left', col);
+    if (o.key === 'mute') { txt(muted ? 'AUS' : 'AN', bx + bw - 40, y, 30, 'right', muted ? '#ff6b5b' : '#6ee07a'); return; }
+    const v = snd[o.key], sx = bx + 345, sw = 150;
+    ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fillRect(sx, y - 20, sw, 16);
+    ctx.fillStyle = muted ? '#777' : sel ? '#ffd23f' : '#cfd8e6'; ctx.fillRect(sx, y - 20, sw * v, 16);
+    txt(Math.round(v * 100) + '%', bx + bw - 40, y, 24, 'right', col);
+  });
+  txt('↑↓ wählen   ←→ ändern   TAB schließen', OW / 2, by + bh - 24, 22, 'center', '#c8d4e4');
+}
+
+function drawScreens() {
   if (state === 'menu') {
     ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(0, 0, OW, OH);
     txt('KART RACER', OW / 2, 130, 110, 'center', '#ffd23f');
     txt('3 Runden, bis zu 4 Spieler – freie Plätze fahren Bots', OW / 2, 185, 28, 'center');
     const lines = ['Pfeiltasten oder WASD: Gas, Bremse, Lenken',
                    'LEERTASTE halten + lenken = Drift, loslassen = Turbo',
-                   'Gelbe Pfeile = Boost      M = Ton aus'];
+                   'Gelbe Pfeile = Boost      TAB = Ton-Optionen'];
     lines.forEach((l, i) => txt(l, OW / 2, 240 + i * 38, 24, 'center', '#e8f2ff'));
     const cursor = Math.floor(time * 2) % 2 ? '_' : ' ';
     txt('Dein Name: ' + myName + cursor, OW / 2, 395, 34, 'center', '#ffe9a0');
