@@ -15,6 +15,10 @@
     background: var(--btn); color: var(--fg); font: inherit; width: 84px; height: 84px; padding: 0; display: grid; place-items: center; }
   #touch button.on { background: var(--btn-on); color: #111; }
   #touch[data-race="0"] .drive { display: none; }
+  #t-start { left: 50%; transform: translateX(-50%); bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    width: auto !important; height: 50px !important; padding: 0 34px !important; border-radius: 28px !important;
+    background: #ffd23f !important; color: #111 !important; font-size: 22px !important; border-color: #fff !important; }
+  #touch[data-start="0"] #t-start { display: none; }
   #touch .drive { bottom: calc(18px + env(safe-area-inset-bottom, 0px)); }
   #t-left  { left: calc(18px + env(safe-area-inset-left, 0px)); font-size: 34px !important; }
   #t-right { left: calc(116px + env(safe-area-inset-left, 0px)); font-size: 34px !important; }
@@ -37,6 +41,7 @@
   <button id="t-drift" class="drive" aria-label="Driften">DRIFT</button>
   <button id="t-brake" class="drive" aria-label="Bremsen">BREMSE</button>
   <button id="t-menu" aria-label="Ton-Optionen">⚙</button>
+  <button id="t-start">▶ RENNEN STARTEN</button>
 </div>
 <input id="name-input" maxlength="12" autocomplete="off" aria-label="Dein Name">
 <div id="turn">Bitte das Handy quer halten<br>📱 ↻</div>
@@ -1448,7 +1453,7 @@ function drawScreens() {
 
     const vs = viewers().slice().sort((a, b) => a.peer < b.peer ? -1 : 1);
     if (room && vs.length > 1) {
-      const rows = Math.min(vs.length, 4);
+      const rows = Math.min(vs.length, touchMode ? 3 : 4); // am Handy Platz für den Start-Knopf lassen
       ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(OW / 2 - 300, 474, 600, 42 + rows * 28);
       txt(`Im Raum: ${vs.length}`, OW / 2 - 280, 500, 22, 'left', '#ffd23f');
       vs.slice(0, rows).forEach((p, i) => {
@@ -1460,9 +1465,12 @@ function drawScreens() {
     } else {
       txt(room ? 'Teile den Link – wer die Seite öffnet, landet hier in der Lobby' : 'Einzelspieler-Modus', OW / 2, 510, 22, 'center', '#c8d4e4');
     }
-    if (roomLabel) txt(`Raum: ${roomLabel}   (eigene Gruppe: ?raum=name an den Link hängen)`, OW / 2, 662, 18, 'center', '#c8d4e4');
+    if (roomLabel) {
+      if (touchMode) txt(`Raum: ${roomLabel}`, OW - 24, 40, 20, 'right', '#c8d4e4');
+      else txt(`Raum: ${roomLabel}   (eigene Gruppe: ?raum=name an den Link hängen)`, OW / 2, 662, 18, 'center', '#c8d4e4');
+    }
     const startMsg = host ? (touchMode ? 'Hier tippen zum Starten' : 'ENTER drücken zum Starten') : `Warte, bis ${peerName(h)} das Rennen startet …`;
-    if (!host || Math.floor(time * 2) % 2 === 0) txt(startMsg, OW / 2, 704, 36, 'center', '#ffffff');
+    if (!host || (!touchMode && Math.floor(time * 2) % 2 === 0)) txt(startMsg, OW / 2, 704, 36, 'center', '#ffffff'); // am Handy gibt es dafür einen Knopf
     return;
   }
 
@@ -1528,7 +1536,7 @@ function drawScreens() {
       const host = amHost(), next = TRACKS[trackIdx].name;
       txt(host ? `◀  Nächste Strecke: ${next}  ▶` : `Nächste Strecke: ${next}`, OW / 2, 580, 30, 'center', '#ffe9a0');
       if (!host) txt(`Warte, bis ${peerName(hostPeer())} das nächste Rennen startet …`, OW / 2, 640, 30, 'center');
-      else if (Math.floor(time * 2) % 2 === 0) txt(touchMode ? 'Hier tippen = neues Rennen' : 'ENTER = neues Rennen', OW / 2, 645, 42, 'center');
+      else if (!touchMode && Math.floor(time * 2) % 2 === 0) txt('ENTER = neues Rennen', OW / 2, 645, 42, 'center');
     }
   }
 }
@@ -1548,7 +1556,18 @@ function syncTouchUi() {
   if (touchEl.hidden === touchMode) touchEl.hidden = !touchMode;
   const r = state === 'race' || state === 'countdown' ? '1' : '0';
   if (touchEl.dataset.race !== r) touchEl.dataset.race = r;
+  // Start-Knopf nur für den Host, im Menü und nach dem Ziel
+  const st = !optionsOpen && amHost() && (state === 'menu' || (state === 'finish' && finishDelay <= 0)) ? '1' : '0';
+  if (touchEl.dataset.start !== st) {
+    touchEl.dataset.start = st;
+    startBtn.textContent = state === 'finish' ? '▶ NÄCHSTES RENNEN' : '▶ RENNEN STARTEN';
+  }
 }
+const startBtn = document.getElementById('t-start');
+startBtn.addEventListener('pointerdown', e => {
+  e.preventDefault(); wake();
+  if (amHost() && (state === 'menu' || (state === 'finish' && finishDelay <= 0))) hostStart();
+});
 function wake() { initAudio(); if (actx && actx.state === 'suspended') actx.resume(); }
 function goFullscreen() {
   const el = document.documentElement;
