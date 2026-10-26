@@ -5,16 +5,18 @@
   :root { --bg: #0d0f14; color-scheme: dark; }
   html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; }
   #wrap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
-  canvas { width: min(100vw, 177.78vh); height: min(56.25vw, 100vh); image-rendering: pixelated; outline: none; }
+  canvas { width: min(100vw, 177.78vh); height: min(56.25vw, 100vh); outline: none; }
 </style>
 <div id="wrap"><canvas id="c" width="1280" height="720" tabindex="0"></canvas></div>
 <script>
 'use strict';
 
 // ===================== Konstanten =====================
-const W = 384, H = 216;          // interne Render-Auflösung (Retro-Look)
-const HORIZON = 70;              // Bildschirmzeile des Horizonts
-const FOCAL = 220;               // Brennweite der Kamera
+const W = 640, H = 360;          // interne Render-Auflösung
+const RS = W / 384;              // Maßstab gegenüber der ursprünglichen Retro-Auflösung
+const HORIZON = Math.round(70 * RS); // Bildschirmzeile des Horizonts
+const FOCAL = 220 * RS;          // Brennweite der Kamera
+const SS = 4;                    // Sprites werden 4-fach so fein gezeichnet
 const CAM_H = 20, CAM_DIST = 48; // Kamerahöhe und Abstand hinter dem Kart
 const LAPS = 3;
 
@@ -23,11 +25,13 @@ const ACC = 95, BRAKE = 180, FRICTION = 40, TURN = 2.1, OFFROAD_MAX = 55;
 const out = document.getElementById('c'), ctx = out.getContext('2d');
 const OW = out.width, OH = out.height;
 const view = mkCanvas(W, H), vctx = view.getContext('2d');
-vctx.imageSmoothingEnabled = false;
+vctx.imageSmoothingEnabled = true; vctx.imageSmoothingQuality = 'high';
 const img = vctx.createImageData(W, H), buf = new Uint32Array(img.data.buffer);
 
 // ===================== Hilfsfunktionen =====================
 function mkCanvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+// Leinwand für Sprites: logisch w×h, intern SS-fach aufgelöst, damit sie beim Vergrößern scharf bleiben
+function hiCanvas(w, h) { const c = mkCanvas(w * SS, h * SS), g = c.getContext('2d'); g.scale(SS, SS); return [c, g]; }
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const wrapA = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
 function shade(hex, f) {
@@ -103,7 +107,7 @@ const MM = 190;                           // Größe der Minikarte
 const SW = Math.round(2 * Math.PI * FOCAL); // Breite des Rundum-Panoramas
 // Zustand der gerade geladenen Strecke
 let trackIdx = 0, builtTrack = -1, track, theme, MAP, ROAD, path, N, pads, trees;
-let texBuf, ground, OUTSIDE, mini, mmS, mtn, skyGrad, fogGrad;
+let texBuf, mips, ground, OUTSIDE, mini, mmS, mtn, skyGrad, fogGrad;
 
 // Catmull-Rom-Spline durch die Kontrollpunkte, gleichmäßig alle 10 Einheiten abgetastet
 function splinePath(ctrl) {
@@ -150,13 +154,13 @@ function decoSprite(kind) {
   const circle = (g, x, y, r, col) => { g.fillStyle = col; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); };
   const poly = (g, pts, col) => { g.fillStyle = col; g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath(); g.fill(); };
   if (kind === 'tree' || kind === 'autumn') {
-    c = mkCanvas(24, 40); ww = 28; const g = c.getContext('2d');
+    ww = 28; const g = (c = mkCanvas(24 * SS, 40 * SS)).getContext('2d'); g.scale(SS, SS);
     const cols = kind === 'tree' ? ['#1f6b2c', '#2a8a3a', '#36a447', '#5cc46b'] : ['#8a3b12', '#c0571b', '#e08a1e', '#f2c04a'];
     g.fillStyle = '#6b4423'; g.fillRect(10, 26, 5, 14);
     circle(g, 12, 19, 10, cols[0]); circle(g, 8, 15, 7, cols[1]); circle(g, 16, 13, 7, cols[1]);
     circle(g, 12, 8, 7, cols[2]); circle(g, 10, 6, 3, cols[3]);
   } else if (kind === 'pine' || kind === 'snowpine') {
-    c = mkCanvas(24, 44); ww = 24; const g = c.getContext('2d');
+    ww = 24; const g = (c = mkCanvas(24 * SS, 44 * SS)).getContext('2d'); g.scale(SS, SS);
     g.fillStyle = '#5a3a1e'; g.fillRect(10, 34, 4, 10);
     const cols = ['#1d5a32', '#226b3a', '#2a7d44'];
     for (let k = 0; k < 3; k++) {
@@ -168,21 +172,21 @@ function decoSprite(kind) {
       }
     }
   } else if (kind === 'palm') {
-    c = mkCanvas(32, 48); ww = 30; const g = c.getContext('2d');
+    ww = 30; const g = (c = mkCanvas(32 * SS, 48 * SS)).getContext('2d'); g.scale(SS, SS);
     g.strokeStyle = '#8a5a2b'; g.lineWidth = 3; g.beginPath(); g.moveTo(14, 48); g.quadraticCurveTo(11, 28, 18, 12); g.stroke();
     for (const [a, col, len] of [[-2.9, '#2f9a3f', 11], [-2.2, '#46b552', 10], [-1.5, '#2f9a3f', 9], [-0.8, '#46b552', 10], [-0.15, '#2f9a3f', 11], [0.5, '#3aa84a', 9]]) {
       g.save(); g.translate(18, 12); g.rotate(a); g.fillStyle = col; g.beginPath(); g.ellipse(len * 0.8, 0, len, 2.6, 0, 0, 7); g.fill(); g.restore();
     }
     circle(g, 16, 14, 2, '#6b4a1e'); circle(g, 20, 14, 2, '#6b4a1e');
   } else if (kind === 'cactus') {
-    c = mkCanvas(24, 40); ww = 20; const g = c.getContext('2d');
+    ww = 20; const g = (c = mkCanvas(24 * SS, 40 * SS)).getContext('2d'); g.scale(SS, SS);
     g.fillStyle = '#3f8f3a';
     g.fillRect(9, 6, 6, 34); circle(g, 12, 6, 3, '#3f8f3a');
     g.fillStyle = '#3f8f3a'; g.fillRect(3, 18, 7, 4); g.fillRect(3, 10, 4, 10); circle(g, 5, 10, 2, '#3f8f3a');
     g.fillStyle = '#3f8f3a'; g.fillRect(14, 22, 7, 4); g.fillRect(17, 14, 4, 10); circle(g, 19, 14, 2, '#3f8f3a');
     g.fillStyle = '#5fb150'; g.fillRect(10, 5, 1, 33); g.fillRect(4, 10, 1, 9); g.fillRect(18, 14, 1, 9);
   } else { // rock / lavarock
-    c = mkCanvas(30, 20); ww = 26; const g = c.getContext('2d');
+    ww = 26; const g = (c = mkCanvas(30 * SS, 20 * SS)).getContext('2d'); g.scale(SS, SS);
     const lava = kind === 'lavarock';
     poly(g, [[1, 20], [3, 10], [10, 3], [20, 2], [27, 8], [29, 20]], lava ? '#2e2629' : '#6d6862');
     poly(g, [[5, 10], [10, 4], [20, 3], [25, 8], [16, 9]], lava ? '#4a3d42' : '#8c867e');
@@ -264,8 +268,16 @@ function buildTrack(i) {
   }
   for (const pad of pads) drawPad(tg, pad, '#ffd23f', true);
   const td = tg.getImageData(0, 0, MAP, MAP), a = td.data;
-  for (let i = 0; i < a.length; i += 4) { const n = (rnd() - 0.5) * 18; a[i] += n; a[i + 1] += n; a[i + 2] += n; }
+  for (let i = 0; i < a.length; i += 4) { const n = (rnd() - 0.5) * 10; a[i] += n; a[i + 1] += n; a[i + 2] += n; }
+  tg.putImageData(td, 0, 0);
   texBuf = new Uint32Array(td.data.buffer);
+  // verkleinerte Fassungen (Mipmaps) gegen Flimmern in der Ferne
+  mips = [texBuf];
+  for (let l = 1, src = tex; l <= 2; l++) {
+    const sz = MAP >> l, c = mkCanvas(sz, sz), g = c.getContext('2d');
+    g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(src, 0, 0, sz, sz);
+    mips.push(new Uint32Array(g.getImageData(0, 0, sz, sz).data.buffer)); src = c;
+  }
   const [orr, og, ob] = hexRgb(theme.outside);
   OUTSIDE = (0xff000000 | (ob << 16) | (og << 8) | orr) >>> 0;
 
@@ -284,15 +296,15 @@ function buildTrack(i) {
   if (theme.stars) {
     for (let i = 0; i < 260; i++) {
       g.fillStyle = `rgba(255,255,255,${0.4 + rnd() * 0.6})`;
-      g.fillRect(Math.floor(rnd() * SW), Math.floor(rnd() * (HORIZON - 12)), 1, 1);
+      g.fillRect(Math.floor(rnd() * SW), Math.floor(rnd() * (HORIZON - 12 * RS)), RS, RS);
     }
     g.fillStyle = '#f4f1dc'; g.beginPath(); g.arc(SW * 0.3, 16, 7, 0, 7); g.fill();
   }
   if (theme.clouds) {
     g.fillStyle = 'rgba(255,255,255,.85)';
     for (let i = 0; i < 14; i++) {
-      const cx = rnd() * SW, cy = 8 + rnd() * 22;
-      for (let k = 0; k < 4; k++) { g.beginPath(); g.ellipse(cx + k * 9 - 13, cy + (k % 2) * 2, 10 + rnd() * 6, 4 + rnd() * 2, 0, 0, 7); g.fill(); }
+      const cx = rnd() * SW, cy = (8 + rnd() * 22) * RS;
+      for (let k = 0; k < 4; k++) { g.beginPath(); g.ellipse(cx + (k * 9 - 13) * RS, cy + (k % 2) * 2 * RS, (10 + rnd() * 6) * RS, (4 + rnd() * 2) * RS, 0, 0, 7); g.fill(); }
     }
   }
   const layer = (color, base, amp, s) => {
@@ -305,12 +317,12 @@ function buildTrack(i) {
     g.lineTo(SW, HORIZON + 1); g.fill();
   };
   const s0 = i * 1.7;
-  layer(theme.mtn[0], 24, 16, 1 + s0);
-  layer(theme.mtn[1], 14, 9, 2.5 + s0);
-  layer(theme.mtn[2], 7, 5, 4 + s0);
+  layer(theme.mtn[0], 24 * RS, 16 * RS, 1 + s0);
+  layer(theme.mtn[1], 14 * RS, 9 * RS, 2.5 + s0);
+  layer(theme.mtn[2], 7 * RS, 5 * RS, 4 + s0);
   skyGrad = vctx.createLinearGradient(0, 0, 0, HORIZON);
   skyGrad.addColorStop(0, theme.sky[0]); skyGrad.addColorStop(1, theme.sky[1]);
-  fogGrad = vctx.createLinearGradient(0, HORIZON, 0, HORIZON + 30);
+  fogGrad = vctx.createLinearGradient(0, HORIZON, 0, HORIZON + 30 * RS);
   fogGrad.addColorStop(0, rgba(theme.sky[1], 0.95)); fogGrad.addColorStop(1, rgba(theme.sky[1], 0));
 
   // Minikarte
@@ -327,42 +339,123 @@ buildTrack(0);
 // ===================== Sprites =====================
 const PXU = 32 / 12; // Sprite-Pixel pro Welteinheit (Kart ist 12 Einheiten breit)
 function kartSprites(body, helmet) {
-  const dark = shade(body, -0.35), mid = shade(body, -0.18), light = shade(body, 0.3), hd = shade(helmet, -0.35);
-  const circle = (g, x, y, r) => { g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); };
-  function rear(front) {
-    const c = mkCanvas(32, 26), g = c.getContext('2d');
-    g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(16, 24, 15, 2.5, 0, 0, 7); g.fill();
-    g.fillStyle = hd; g.fillRect(10, 8, 12, 6);
-    g.fillStyle = helmet; circle(g, 16, 6, 5.5);
-    if (front) { g.fillStyle = '#223'; g.fillRect(12, 4, 8, 3); g.fillStyle = '#fff'; g.fillRect(13, 4, 2, 1); }
-    else { g.fillStyle = body; g.fillRect(13, 2, 6, 2); }
-    g.fillStyle = '#151515'; g.fillRect(0, 14, 8, 10); g.fillRect(24, 14, 8, 10);
-    g.fillStyle = '#555'; for (let y = 16; y < 24; y += 3) { g.fillRect(1, y, 6, 1); g.fillRect(25, y, 6, 1); }
-    g.fillStyle = body; g.fillRect(6, 13, 20, 8);
-    g.fillStyle = dark; g.fillRect(6, 19, 20, 3);
-    g.fillStyle = light; g.fillRect(7, 13, 18, 1);
-    if (front) {
-      g.fillStyle = '#ffe680'; g.fillRect(8, 15, 4, 2); g.fillRect(20, 15, 4, 2);
-      g.fillStyle = '#ccc'; g.fillRect(11, 11, 10, 2);
+  const dark = shade(body, -0.4), mid = shade(body, -0.2), light = shade(body, 0.35);
+  const hLight = shade(helmet, 0.5), hDark = shade(helmet, -0.35), suit = shade(body, -0.55);
+  const rr = (g, x, y, w, h, r) => {
+    g.beginPath(); g.moveTo(x + r, y);
+    g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+    g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+  };
+  const grad = (g, x0, y0, x1, y1, cols) => {
+    const gr = g.createLinearGradient(x0, y0, x1, y1);
+    cols.forEach((c, i) => gr.addColorStop(i / (cols.length - 1), c));
+    return gr;
+  };
+  const shadow = (g, cx, w) => { g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(cx, 24.2, w, 2, 0, 0, 7); g.fill(); };
+
+  // Reifen von hinten/vorne gesehen: gerundet, mit Profil
+  function tire(g, x, y, w, h) {
+    g.fillStyle = grad(g, x, 0, x + w, 0, ['#3c3c3c', '#151515', '#2c2c2c']); rr(g, x, y, w, h, 2.2); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,.13)'; g.lineWidth = 0.5;
+    for (let ty = y + 1.6; ty < y + h - 1; ty += 1.8) { g.beginPath(); g.moveTo(x + 1.2, ty); g.lineTo(x + w - 1.2, ty); g.stroke(); }
+  }
+  // Reifen von der Seite: Gummi, Felge mit Speichen, Nabe
+  function wheel(g, cx, cy, r) {
+    const gr = g.createRadialGradient(cx - r * 0.3, cy - r * 0.3, r * 0.2, cx, cy, r);
+    gr.addColorStop(0, '#3e3e3e'); gr.addColorStop(1, '#0e0e0e');
+    g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, r, 0, 7); g.fill();
+    const rim = g.createRadialGradient(cx - r * 0.15, cy - r * 0.15, 0, cx, cy, r * 0.5);
+    rim.addColorStop(0, '#f4f4f4'); rim.addColorStop(1, '#9a9a9a');
+    g.fillStyle = rim; g.beginPath(); g.arc(cx, cy, r * 0.5, 0, 7); g.fill();
+    g.strokeStyle = '#666'; g.lineWidth = 0.45;
+    for (let k = 0; k < 5; k++) {
+      const a = k / 5 * Math.PI * 2;
+      g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(a) * r * 0.46, cy + Math.sin(a) * r * 0.46); g.stroke();
+    }
+    g.fillStyle = '#333'; g.beginPath(); g.arc(cx, cy, r * 0.15, 0, 7); g.fill();
+  }
+  // Helm mit Glanzlicht; vorne mit Visier, hinten mit Streifen, seitlich mit Visier rechts
+  function helmetAt(g, cx, cy, r, view) {
+    const gr = g.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.1, cx, cy, r);
+    gr.addColorStop(0, hLight); gr.addColorStop(0.6, helmet); gr.addColorStop(1, hDark);
+    g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, r, 0, 7); g.fill();
+    if (view === 'front') {
+      g.fillStyle = '#1b2233'; rr(g, cx - r * 0.75, cy - r * 0.3, r * 1.5, r * 0.7, r * 0.3); g.fill();
+      g.fillStyle = 'rgba(255,255,255,.55)'; rr(g, cx - r * 0.55, cy - r * 0.22, r * 0.55, r * 0.17, r * 0.08); g.fill();
+    } else if (view === 'side') {
+      g.fillStyle = '#1b2233'; rr(g, cx + r * 0.35, cy - r * 0.35, r * 0.75, r * 0.65, r * 0.25); g.fill();
+      g.fillStyle = 'rgba(255,255,255,.5)'; rr(g, cx + r * 0.5, cy - r * 0.27, r * 0.35, r * 0.15, r * 0.07); g.fill();
+      g.fillStyle = body; rr(g, cx - r * 0.95, cy - r * 0.15, r * 1.1, r * 0.3, r * 0.15); g.fill();
     } else {
-      g.fillStyle = mid; g.fillRect(3, 10, 26, 3);
-      g.fillStyle = '#999'; g.fillRect(10, 19, 3, 3); g.fillRect(19, 19, 3, 3);
-      g.fillStyle = '#333'; g.fillRect(11, 20, 1, 1); g.fillRect(20, 20, 1, 1);
+      g.fillStyle = body; rr(g, cx - r * 0.18, cy - r * 0.95, r * 0.36, r * 1.6, r * 0.18); g.fill();
+    }
+  }
+
+  function rear(front) {
+    const [c, g] = hiCanvas(32, 26);
+    shadow(g, 16, 15.5);
+    const ty = front ? 15 : 14, th = front ? 9.5 : 10.5;
+    tire(g, 0.5, ty, 7.5, th); tire(g, 24, ty, 7.5, th);
+    g.fillStyle = '#2b2b2e'; g.fillRect(6, 18, 20, 2); // Achse
+    // Fahrer
+    g.fillStyle = suit; g.beginPath(); g.ellipse(16, 11, 6.2, 3.4, 0, 0, 7); g.fill();
+    helmetAt(g, 16, 5.8, 5.2, front ? 'front' : 'back');
+    if (!front) { g.fillStyle = grad(g, 0, 9.5, 0, 13.5, [mid, dark]); rr(g, 10.5, 9.5, 11, 4, 1.5); g.fill(); } // Sitzlehne
+    // Karosserie mit Glanzkante
+    g.fillStyle = grad(g, 0, 12, 0, 21.5, [light, body, dark]); rr(g, 5, 12, 22, 9.5, 3); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.35)'; rr(g, 7, 12.6, 18, 1.1, 0.55); g.fill();
+    if (front) {
+      // Lenkrad mit Händen
+      g.strokeStyle = '#222'; g.lineWidth = 1.3; g.beginPath(); g.arc(16, 13, 3.6, Math.PI * 1.12, Math.PI * 1.88); g.stroke();
+      g.fillStyle = '#f2f2f2'; g.beginPath(); g.arc(12.9, 11.6, 1.1, 0, 7); g.fill(); g.beginPath(); g.arc(19.1, 11.6, 1.1, 0, 7); g.fill();
+      // Scheinwerfer und Frontschürze
+      for (const x of [9, 23]) {
+        const gr = g.createRadialGradient(x - 0.4, 16.2, 0.2, x, 16.5, 1.8);
+        gr.addColorStop(0, '#ffffff'); gr.addColorStop(1, '#ffd84d');
+        g.fillStyle = gr; g.beginPath(); g.arc(x, 16.5, 1.7, 0, 7); g.fill();
+      }
+      g.fillStyle = '#26262a'; rr(g, 8, 19.3, 16, 2.6, 1.2); g.fill();
+      g.fillStyle = '#fff'; g.beginPath(); g.arc(16, 16.4, 1.9, 0, 7); g.fill();
+      g.fillStyle = dark; g.beginPath(); g.arc(16, 16.4, 1, 0, 7); g.fill();
+    } else {
+      // Stoßfänger, Auspuff, Rücklichter, Heckflügel
+      g.fillStyle = '#26262a'; rr(g, 7, 19.4, 18, 2.8, 1.3); g.fill();
+      for (const x of [11.5, 20.5]) {
+        const gr = g.createRadialGradient(x, 19.6, 0.2, x, 19.6, 1.8);
+        gr.addColorStop(0, '#111'); gr.addColorStop(0.45, '#555'); gr.addColorStop(1, '#c4c4c4');
+        g.fillStyle = gr; g.beginPath(); g.arc(x, 19.6, 1.7, 0, 7); g.fill();
+      }
+      g.fillStyle = '#ff4a3a'; rr(g, 6.5, 15, 2.4, 1.6, 0.6); g.fill(); rr(g, 23.1, 15, 2.4, 1.6, 0.6); g.fill();
+      g.fillStyle = '#333'; g.fillRect(8.5, 10.5, 1.2, 3); g.fillRect(22.3, 10.5, 1.2, 3);
+      g.fillStyle = grad(g, 0, 8.6, 0, 11.6, [light, mid]); rr(g, 3, 8.6, 26, 3, 1.4); g.fill();
+      g.fillStyle = 'rgba(255,255,255,.4)'; rr(g, 4.5, 9, 23, 0.7, 0.35); g.fill();
     }
     return c;
   }
-  function side() {
-    const c = mkCanvas(40, 26), g = c.getContext('2d');
-    g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(20, 24, 19, 2.5, 0, 0, 7); g.fill();
-    g.fillStyle = mid; g.fillRect(1, 9, 4, 7);
-    g.fillStyle = hd; g.fillRect(14, 9, 8, 6);
-    g.fillStyle = helmet; circle(g, 18, 6, 5.5);
-    g.fillStyle = '#223'; g.fillRect(20, 4, 4, 3);
-    g.fillStyle = body; g.beginPath(); g.moveTo(3, 13); g.lineTo(33, 13); g.lineTo(39, 17); g.lineTo(39, 20); g.lineTo(3, 20); g.closePath(); g.fill();
-    g.fillStyle = dark; g.fillRect(3, 18, 36, 2);
-    g.fillStyle = light; g.fillRect(4, 13, 28, 1);
-    g.fillStyle = '#151515'; circle(g, 9, 20, 5); circle(g, 31, 20, 5);
-    g.fillStyle = '#888'; circle(g, 9, 20, 2); circle(g, 31, 20, 2);
+
+  function side() { // Blick von links, Fahrtrichtung nach rechts
+    const [c, g] = hiCanvas(40, 26);
+    shadow(g, 20, 19);
+    // Heckflügel
+    g.fillStyle = '#333'; g.fillRect(2.6, 10, 1.2, 4.5);
+    g.fillStyle = grad(g, 0, 7.5, 0, 10.5, [light, mid]); rr(g, 0.5, 7.5, 6, 3, 1.2); g.fill();
+    // Fahrer mit Sitz, Arm und Lenkrad
+    g.fillStyle = grad(g, 0, 7.5, 0, 14.5, [mid, dark]); rr(g, 11, 7.5, 4, 7, 1.5); g.fill();
+    g.fillStyle = suit; rr(g, 14, 8.5, 7, 6, 2.5); g.fill();
+    g.strokeStyle = suit; g.lineWidth = 1.6; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(19, 10.5); g.lineTo(23.8, 11.6); g.stroke();
+    g.strokeStyle = '#222'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(24.4, 9.4); g.lineTo(25.4, 13.6); g.stroke();
+    helmetAt(g, 18, 5.6, 5, 'side');
+    // Karosserie: flach, nach vorne zur Nase abgerundet
+    g.fillStyle = grad(g, 0, 13, 0, 21, [light, body, dark]);
+    g.beginPath(); g.moveTo(4, 13.5); g.lineTo(25, 13.5); g.quadraticCurveTo(35, 13.8, 39.2, 17.2);
+    g.lineTo(39.2, 19.6); g.lineTo(5, 20.6); g.quadraticCurveTo(2.5, 20.4, 2.5, 17.5);
+    g.lineTo(2.5, 15); g.quadraticCurveTo(2.6, 13.5, 4, 13.5); g.closePath(); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.4)'; rr(g, 5, 14, 22, 0.9, 0.45); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.85)'; rr(g, 15, 16.2, 9, 1.4, 0.7); g.fill();
+    // Auspuff
+    g.fillStyle = grad(g, 0, 15.6, 0, 17.3, ['#e0e0e0', '#777']); rr(g, 0, 15.6, 3.5, 1.7, 0.8); g.fill();
+    wheel(g, 9, 20, 5.2); wheel(g, 32, 20.6, 4.6);
     return c;
   }
   return { back: rear(false), front: rear(true), side: side() };
@@ -1072,7 +1165,7 @@ function update(dt) {
       }
       if (finishDelay > 0) finishDelay -= dt;
     }
-    for (const p of particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 60 * dt; p.life -= dt; }
+    for (const p of particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 60 * RS * dt; p.life -= dt; }
     particles = particles.filter(p => p.life > 0);
   }
   placeCam(dt);
@@ -1083,24 +1176,45 @@ function update(dt) {
 // ===================== Rendering =====================
 function renderFloor() {
   const fx = Math.cos(cam.a), fy = Math.sin(cam.a), rx = -fy, ry = fx;
-  const MAP_ = MAP, tb = texBuf, OUT = OUTSIDE;
+  const OUT = OUTSIDE;
   for (let y = HORIZON + 1; y < H; y++) {
-    const z = CAM_H * FOCAL / (y - HORIZON), s = z / FOCAL;
+    const z = CAM_H * FOCAL / (y - HORIZON), s = z / FOCAL; // s = Welteinheiten pro Bildschirmpixel
     let wx = cam.x + fx * z - rx * s * W / 2, wy = cam.y + fy * z - ry * s * W / 2;
     const dx = rx * s, dy = ry * s;
     let o = y * W;
-    for (let x = 0; x < W; x++) {
-      const u = Math.floor(wx), v = Math.floor(wy);
-      buf[o++] = (u >= 0 && u < MAP_ && v >= 0 && v < MAP_) ? tb[v * MAP_ + u] : OUT;
-      wx += dx; wy += dy;
+    if (s < 0.9) {
+      // nah: zwischen vier Texeln weich überblenden statt Blöcke zu zeigen
+      const M = MAP, tb = texBuf;
+      for (let x = 0; x < W; x++) {
+        const fu = wx - 0.5, fv = wy - 0.5, u = Math.floor(fu), v = Math.floor(fv);
+        if (u < 0 || v < 0 || u >= M - 1 || v >= M - 1) buf[o++] = OUT;
+        else {
+          const ax = fu - u, ay = fv - v, i = v * M + u;
+          const c00 = tb[i], c10 = tb[i + 1], c01 = tb[i + M], c11 = tb[i + M + 1];
+          const w00 = (1 - ax) * (1 - ay), w10 = ax * (1 - ay), w01 = (1 - ax) * ay, w11 = ax * ay;
+          const r = (c00 & 255) * w00 + (c10 & 255) * w10 + (c01 & 255) * w01 + (c11 & 255) * w11;
+          const g = (c00 >> 8 & 255) * w00 + (c10 >> 8 & 255) * w10 + (c01 >> 8 & 255) * w01 + (c11 >> 8 & 255) * w11;
+          const b = (c00 >> 16 & 255) * w00 + (c10 >> 16 & 255) * w10 + (c01 >> 16 & 255) * w01 + (c11 >> 16 & 255) * w11;
+          buf[o++] = 0xff000000 | (b << 16) | (g << 8) | r;
+        }
+        wx += dx; wy += dy;
+      }
+    } else {
+      // fern: passende verkleinerte Textur, damit nichts flimmert
+      const lvl = s < 2.5 ? 0 : s < 5 ? 1 : 2, tb = mips[lvl], M = MAP >> lvl, k = 1 / (1 << lvl);
+      for (let x = 0; x < W; x++) {
+        const u = Math.floor(wx * k), v = Math.floor(wy * k);
+        buf[o++] = (u >= 0 && u < M && v >= 0 && v < M) ? tb[v * M + u] : OUT;
+        wx += dx; wy += dy;
+      }
     }
   }
 }
 
 // Sprites für Item-Boxen und Panzer
-const boxImg = mkCanvas(20, 20);
+const [boxImg, boxG] = hiCanvas(20, 20);
 {
-  const g = boxImg.getContext('2d');
+  const g = boxG;
   g.fillStyle = '#fff'; g.fillRect(0, 0, 20, 20);
   const gr = g.createLinearGradient(0, 0, 20, 20);
   gr.addColorStop(0, '#ff5fd2'); gr.addColorStop(0.5, '#4fc3ff'); gr.addColorStop(1, '#ffe14d');
@@ -1108,7 +1222,7 @@ const boxImg = mkCanvas(20, 20);
   g.fillStyle = '#fff'; g.font = 'bold 15px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('?', 10, 11);
 }
 function shellSprite(col, dark) {
-  const c = mkCanvas(16, 12), g = c.getContext('2d');
+  const [c, g] = hiCanvas(16, 12);
   g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(8, 11, 7, 1.5, 0, 0, 7); g.fill();
   g.fillStyle = '#f4f4f4'; g.fillRect(1, 7, 14, 3);
   g.fillStyle = col; g.beginPath(); g.arc(8, 8, 7, Math.PI, 0); g.fill();
@@ -1125,7 +1239,7 @@ function render() {
   // Boden (Mode-7-artig)
   renderFloor();
   vctx.putImageData(img, 0, 0, 0, HORIZON + 1, W, H - HORIZON - 1);
-  vctx.fillStyle = fogGrad; vctx.fillRect(0, HORIZON, W, 30);
+  vctx.fillStyle = fogGrad; vctx.fillRect(0, HORIZON, W, 30 * RS);
 
   // Sprites projizieren und von hinten nach vorne zeichnen
   const cfx = Math.cos(cam.a), cfy = Math.sin(cam.a), crx = -cfy, cry = cfx;
@@ -1175,7 +1289,7 @@ function render() {
     if (Math.abs(rel) > 2.4) im = k.spr.front;
     else if (Math.abs(rel) > 0.7) { im = k.spr.side; flip = rel < 0; }
     else rot = clamp(rel * 0.6, -0.3, 0.3);
-    const w = im.width / PXU * s.sc * (k.small > 0 ? 0.55 : 1), h = w * im.height / im.width;
+    const w = im.width / SS / PXU * s.sc * (k.small > 0 ? 0.55 : 1), h = w * im.height / im.width;
     const lift = k.hop > 0 ? Math.sin((0.25 - k.hop) / 0.25 * Math.PI) * 2.5 * s.sc : 0;
     vctx.save(); vctx.translate(s.sx, s.sy - lift); vctx.rotate(rot); if (flip) vctx.scale(-1, 1);
     vctx.drawImage(im, -w / 2, -h, w, h);
@@ -1195,12 +1309,12 @@ function render() {
       if (k.drifting) {
         const col = k.driftCharge > 1.4 ? '#ff9a1f' : k.driftCharge > 0.7 ? '#3fb8ff' : '#e8e8e8';
         for (const wx of [-4.5, 4.5]) particles.push({
-          x: s.sx + wx * s.sc, y: s.sy - 1, vx: (wx > 0 ? 1 : -1) * (10 + Math.random() * 30) - k.driftDir * 15,
-          vy: -20 - Math.random() * 30, life: 0.25 + Math.random() * 0.15, col, size: 1 + Math.random() * 1.5,
+          x: s.sx + wx * s.sc, y: s.sy - 1, vx: ((wx > 0 ? 1 : -1) * (10 + Math.random() * 30) - k.driftDir * 15) * RS,
+          vy: (-20 - Math.random() * 30) * RS, life: 0.25 + Math.random() * 0.15, col, size: (1 + Math.random() * 1.5) * RS,
         });
       } else if (surfaceAt(k.x, k.y) === 0 && Math.abs(k.speed) > 30) {
-        particles.push({ x: s.sx + (Math.random() - 0.5) * w, y: s.sy - 1, vx: (Math.random() - 0.5) * 40,
-          vy: -15 - Math.random() * 20, life: 0.35, col: '#8a6a3a', size: 2 + Math.random() * 2 });
+        particles.push({ x: s.sx + (Math.random() - 0.5) * w, y: s.sy - 1, vx: (Math.random() - 0.5) * 40 * RS,
+          vy: (-15 - Math.random() * 20) * RS, life: 0.35, col: '#8a6a3a', size: (2 + Math.random() * 2) * RS });
       }
     }
   }
@@ -1208,7 +1322,7 @@ function render() {
   if (zapFlash > 0) { vctx.fillStyle = `rgba(255,255,220,${Math.min(0.8, zapFlash * 1.6)})`; vctx.fillRect(0, 0, W, H); }
 
   // hochskalieren + HUD in voller Auflösung
-  ctx.imageSmoothingEnabled = false;
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(view, 0, 0, OW, OH);
   drawHud();
 }
