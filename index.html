@@ -877,6 +877,7 @@ function update(dt) {
       for (const k of karts) if (!k.remote) updateProgress(k);
       if (state === 'race' && player.finished) {
         state = 'finish'; finishDelay = 1.5;
+        if (amHost()) chooseTrack(builtTrack + 1); // nächstes Rennen automatisch auf der nächsten Strecke
         const pos = ranking().indexOf(player) + 1;
         [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => beep(f, 0.3, 'triangle', 0.1), i * 140 * (pos === 1 ? 1 : 1.6)));
       }
