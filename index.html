@@ -1,13 +1,45 @@
 <title>Kart Racer</title>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <style>
   /* Einzelner, bewusst dunkler Arcade-Look: Spielfläche zentriert auf schwarzem Grund */
-  :root { --bg: #0d0f14; color-scheme: dark; }
-  html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; }
+  :root { --bg: #0d0f14; --btn: rgba(20, 24, 34, .45); --btn-on: rgba(255, 210, 63, .75); --btn-line: rgba(255, 255, 255, .7); --fg: #fff; color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; touch-action: none;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
   #wrap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
   canvas { width: min(100vw, 177.78vh); height: min(56.25vw, 100vh); outline: none; }
+
+  /* Touch-Steuerung fürs Handy: links lenken, rechts Drift/Item/Bremse, Gas geht automatisch */
+  #touch { position: fixed; inset: 0; pointer-events: none; font: 800 italic 15px "Segoe UI", system-ui, sans-serif; color: var(--fg); }
+  #touch button { pointer-events: auto; touch-action: none; position: absolute; border: 3px solid var(--btn-line); border-radius: 50%;
+    background: var(--btn); color: var(--fg); font: inherit; width: 84px; height: 84px; padding: 0; display: grid; place-items: center; }
+  #touch button.on { background: var(--btn-on); color: #111; }
+  #touch[data-race="0"] .drive { display: none; }
+  #touch .drive { bottom: calc(18px + env(safe-area-inset-bottom, 0px)); }
+  #t-left  { left: calc(18px + env(safe-area-inset-left, 0px)); font-size: 34px !important; }
+  #t-right { left: calc(116px + env(safe-area-inset-left, 0px)); font-size: 34px !important; }
+  #t-drift { right: calc(18px + env(safe-area-inset-right, 0px)); width: 96px !important; height: 96px !important; }
+  #t-item  { right: calc(126px + env(safe-area-inset-right, 0px)); }
+  #t-brake { right: calc(30px + env(safe-area-inset-right, 0px)); bottom: calc(128px + env(safe-area-inset-bottom, 0px)) !important; width: 64px !important; height: 64px !important; font-size: 13px !important; }
+  #t-menu  { left: calc(10px + env(safe-area-inset-left, 0px)); top: calc(10px + env(safe-area-inset-top, 0px));
+    width: 48px !important; height: 48px !important; font-size: 22px !important; }
+  #touch[data-race="1"] #t-menu { top: auto; left: 50%; transform: translateX(-50%); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+  #turn { position: fixed; inset: 0; display: none; place-items: center; text-align: center; background: var(--bg); color: var(--fg);
+    font: 800 italic 22px "Segoe UI", system-ui, sans-serif; padding: 24px; }
+  @media (orientation: portrait) and (pointer: coarse) { #turn { display: grid; } }
+  #name-input { position: fixed; left: 0; top: 0; width: 1px; height: 1px; opacity: 0; border: 0; padding: 0; font-size: 16px; }
 </style>
 <div id="wrap"><canvas id="c" width="1280" height="720" tabindex="0"></canvas></div>
+<div id="touch" hidden>
+  <button id="t-left" class="drive" aria-label="Links lenken">◀</button>
+  <button id="t-right" class="drive" aria-label="Rechts lenken">▶</button>
+  <button id="t-item" class="drive" aria-label="Item benutzen">ITEM</button>
+  <button id="t-drift" class="drive" aria-label="Driften">DRIFT</button>
+  <button id="t-brake" class="drive" aria-label="Bremsen">BREMSE</button>
+  <button id="t-menu" aria-label="Ton-Optionen">⚙</button>
+</div>
+<input id="name-input" maxlength="12" autocomplete="off" aria-label="Dein Name">
+<div id="turn">Bitte das Handy quer halten<br>📱 ↻</div>
 <script>
 'use strict';
 
@@ -780,21 +812,23 @@ function toggleOptions() {
   if (optionsOpen && !paused && soloRace() && (state === 'race' || state === 'countdown')) { paused = true; pausedByOptions = true; }
   if (!optionsOpen && pausedByOptions) { paused = false; pausedByOptions = false; }
 }
+function changeOption(i, dir) {
+  const o = OPTIONS[i];
+  if (o.key === 'mute') muted = !muted;
+  else {
+    snd[o.key] = Math.round(clamp(snd[o.key] + dir * 0.1, 0, 1) * 10) / 10;
+    if (o.key === 'master' && muted && dir > 0) muted = false;
+  }
+  initAudio(); if (actx && actx.state === 'suspended') actx.resume();
+  if (o.key !== 'engine') beep(660, 0.12, 'triangle', 0.08); // Hörprobe
+  saveSound();
+}
 function optionsKey(e) {
-  const o = OPTIONS[optSel];
   if (e.code === 'ArrowUp' || e.code === 'KeyW') optSel = (optSel + OPTIONS.length - 1) % OPTIONS.length;
   else if (e.code === 'ArrowDown' || e.code === 'KeyS') optSel = (optSel + 1) % OPTIONS.length;
-  else if (['ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD', 'Enter', 'Space'].includes(e.code)) {
-    const dir = e.code === 'ArrowLeft' || e.code === 'KeyA' ? -1 : 1;
-    if (o.key === 'mute') muted = !muted;
-    else {
-      snd[o.key] = Math.round(clamp(snd[o.key] + dir * 0.1, 0, 1) * 10) / 10;
-      if (o.key === 'master' && muted && dir > 0) muted = false;
-    }
-    initAudio(); if (actx && actx.state === 'suspended') actx.resume();
-    if (o.key !== 'engine') beep(660, 0.12, 'triangle', 0.08); // Hörprobe
-    saveSound();
-  } else if (e.code === 'KeyM') { muted = !muted; saveSound(); }
+  else if (['ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD', 'Enter', 'Space'].includes(e.code))
+    changeOption(optSel, e.code === 'ArrowLeft' || e.code === 'KeyA' ? -1 : 1);
+  else if (e.code === 'KeyM') { muted = !muted; saveSound(); }
   else if (e.code === 'Escape') toggleOptions();
 }
 
@@ -819,13 +853,18 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 
+// Touch: sobald einmal ein Finger das Spiel bedient hat, gibt das Kart automatisch Gas
+let touchMode = matchMedia('(pointer: coarse)').matches;
+const touchKeys = { left: false, right: false, drift: false, brake: false };
+
 function playerInput() {
   if (optionsOpen) return { gas: false, brake: false, steer: 0, drift: false };
+  const brake = !!(keys.ArrowDown || keys.KeyS || touchKeys.brake);
   return {
-    gas: !!(keys.ArrowUp || keys.KeyW),
-    brake: !!(keys.ArrowDown || keys.KeyS),
-    steer: (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0),
-    drift: !!(keys.Space || keys.ShiftLeft || keys.ShiftRight),
+    gas: !!(keys.ArrowUp || keys.KeyW || (touchMode && !brake)),
+    brake,
+    steer: (keys.ArrowRight || keys.KeyD || touchKeys.right ? 1 : 0) - (keys.ArrowLeft || keys.KeyA || touchKeys.left ? 1 : 0),
+    drift: !!(keys.Space || keys.ShiftLeft || keys.ShiftRight || touchKeys.drift),
   };
 }
 
@@ -1377,7 +1416,7 @@ function drawOptions() {
     ctx.fillStyle = muted ? '#777' : sel ? '#ffd23f' : '#cfd8e6'; ctx.fillRect(sx, y - 20, sw * v, 16);
     txt(Math.round(v * 100) + '%', bx + bw - 40, y, 24, 'right', col);
   });
-  txt('↑↓ wählen   ←→ ändern   TAB schließen', OW / 2, by + bh - 24, 22, 'center', '#c8d4e4');
+  txt(touchMode ? 'Links/rechts in der Zeile antippen   außerhalb tippen = schließen' : '↑↓ wählen   ←→ ändern   TAB schließen', OW / 2, by + bh - 24, 22, 'center', '#c8d4e4');
 }
 
 function drawScreens() {
@@ -1385,14 +1424,18 @@ function drawScreens() {
     ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(0, 0, OW, OH);
     txt('KART RACER', OW / 2, 120, 100, 'center', '#ffd23f');
     txt('3 Runden, bis zu 4 Spieler – freie Plätze fahren Bots', OW / 2, 172, 26, 'center');
-    const lines = ['Pfeiltasten oder WASD: Gas, Bremse, Lenken',
-                   'LEERTASTE halten + lenken = Drift, loslassen = Turbo',
-                   '?-Boxen einsammeln, E = Item benutzen      TAB = Ton-Optionen'];
+    const lines = touchMode
+      ? ['Gas gibt das Kart von selbst, links unten lenkst du',
+         'DRIFT halten + lenken, loslassen = Turbo',
+         '?-Boxen einsammeln, ITEM = benutzen      ⚙ = Ton-Optionen']
+      : ['Pfeiltasten oder WASD: Gas, Bremse, Lenken',
+         'LEERTASTE halten + lenken = Drift, loslassen = Turbo',
+         '?-Boxen einsammeln, E = Item benutzen      TAB = Ton-Optionen'];
     lines.forEach((l, i) => txt(l, OW / 2, 222 + i * 34, 22, 'center', '#e8f2ff'));
     const h = hostPeer(), host = amHost();
     // Streckenwahl
     txt(`${host ? '◀  ' : ''}Strecke ${trackIdx + 1}/${TRACKS.length}: ${TRACKS[trackIdx].name}${host ? '  ▶' : ''}`, OW / 2, 352, 34, 'center', '#ffffff');
-    txt(host ? '(← → wechselt die Strecke)' : '(der Host wählt die Strecke)', OW / 2, 380, 18, 'center', '#c8d4e4');
+    txt(host ? (touchMode ? '(◀ ▶ antippen wechselt die Strecke)' : '(← → wechselt die Strecke)') : '(der Host wählt die Strecke)', OW / 2, 380, 18, 'center', '#c8d4e4');
     if (builtTrack === trackIdx) {
       const px = OW - MM - 46, py = 196;
       ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(px - 8, py - 8, MM + 16, MM + 44);
@@ -1401,7 +1444,7 @@ function drawScreens() {
     }
     const cursor = Math.floor(time * 2) % 2 ? '_' : ' ';
     txt('Dein Name: ' + myName + cursor, OW / 2, 432, 30, 'center', '#ffe9a0');
-    txt('(einfach tippen, Rücktaste löscht)', OW / 2, 457, 18, 'center', '#c8d4e4');
+    txt(touchMode ? '(antippen zum Ändern)' : '(einfach tippen, Rücktaste löscht)', OW / 2, 457, 18, 'center', '#c8d4e4');
 
     const vs = viewers().slice().sort((a, b) => a.peer < b.peer ? -1 : 1);
     if (room && vs.length > 1) {
@@ -1418,7 +1461,7 @@ function drawScreens() {
       txt(room ? 'Teile den Link – wer die Seite öffnet, landet hier in der Lobby' : 'Einzelspieler-Modus', OW / 2, 510, 22, 'center', '#c8d4e4');
     }
     if (roomLabel) txt(`Raum: ${roomLabel}   (eigene Gruppe: ?raum=name an den Link hängen)`, OW / 2, 662, 18, 'center', '#c8d4e4');
-    const startMsg = host ? 'ENTER drücken zum Starten' : `Warte, bis ${peerName(h)} das Rennen startet …`;
+    const startMsg = host ? (touchMode ? 'Hier tippen zum Starten' : 'ENTER drücken zum Starten') : `Warte, bis ${peerName(h)} das Rennen startet …`;
     if (!host || Math.floor(time * 2) % 2 === 0) txt(startMsg, OW / 2, 704, 36, 'center', '#ffffff');
     return;
   }
@@ -1431,15 +1474,17 @@ function drawScreens() {
   txt(`RUNDE ${clamp(player.lap, 1, LAPS)}/${LAPS}`, 30, 62, 46);
   txt(fmtTime(player.finished ? player.finishTime : raceTime), 30, 108, 34, 'left', '#ffe9a0');
   // Geschwindigkeit + Drift-Anzeige
-  txt(`${Math.round(Math.abs(player.speed) * 0.8)} km/h`, 30, OH - 30, 38);
+  // auf dem Handy liegen unten die Touch-Knöpfe, deshalb wandern Tempo und Platz nach oben
+  const speedY = touchMode ? 152 : OH - 30, barY = touchMode ? 170 : OH - 92;
+  txt(`${Math.round(Math.abs(player.speed) * 0.8)} km/h`, 30, speedY, touchMode ? 30 : 38);
   if (player.drifting) {
     const c = player.driftCharge, col = c > 1.4 ? '#ff9a1f' : c > 0.7 ? '#3fb8ff' : '#bbb';
-    ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(30, OH - 92, 220, 18);
-    ctx.fillStyle = col; ctx.fillRect(33, OH - 89, 214 * Math.min(1, c / 1.4), 12);
+    ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(30, barY, 220, 18);
+    ctx.fillStyle = col; ctx.fillRect(33, barY + 3, 214 * Math.min(1, c / 1.4), 12);
   }
   // Platzierung
   const posCol = ['#ffd700', '#d8d8e0', '#e09050', '#ffffff'][pos - 1];
-  txt(pos + '.', OW - 40, OH - 30, 130, 'right', posCol);
+  txt(pos + '.', OW - 40, touchMode ? 330 : OH - 30, touchMode ? 100 : 130, 'right', posCol);
   // Minikarte
   const mx = OW - MM - 24, my = 24;
   ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(mx - 6, my - 6, MM + 12, MM + 12);
@@ -1455,7 +1500,7 @@ function drawScreens() {
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.strokeRect(bx, by, 110, 110);
     const shown = player.roll > 0 ? ITEMS[Math.floor(time * 14) % ITEMS.length] : player.item;
     if (shown) drawItemIcon(shown, OW / 2, by + 55, 80);
-    if (player.item && player.roll <= 0) txt('E', OW / 2 + 48, by + 108, 26, 'right', '#ffd23f');
+    if (player.item && player.roll <= 0) txt(touchMode ? 'ITEM' : 'E', OW / 2 + 48, by + 108, 26, 'right', '#ffd23f');
   }
 
   if (state === 'countdown') {
@@ -1467,7 +1512,7 @@ function drawScreens() {
   if (paused) {
     ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(0, 0, OW, OH);
     txt('PAUSE', OW / 2, OH / 2, 110, 'center');
-    txt('P = weiter     R = Neustart', OW / 2, OH / 2 + 60, 30, 'center');
+    txt(touchMode ? '⚙ antippen = weiter' : 'P = weiter     R = Neustart', OW / 2, OH / 2 + 60, 30, 'center');
   }
   if (state === 'finish') {
     txt('ZIEL!', OW / 2, 150, 120, 'center', '#ffd23f');
@@ -1483,7 +1528,7 @@ function drawScreens() {
       const host = amHost(), next = TRACKS[trackIdx].name;
       txt(host ? `◀  Nächste Strecke: ${next}  ▶` : `Nächste Strecke: ${next}`, OW / 2, 580, 30, 'center', '#ffe9a0');
       if (!host) txt(`Warte, bis ${peerName(hostPeer())} das nächste Rennen startet …`, OW / 2, 640, 30, 'center');
-      else if (Math.floor(time * 2) % 2 === 0) txt('ENTER = neues Rennen', OW / 2, 645, 42, 'center');
+      else if (Math.floor(time * 2) % 2 === 0) txt(touchMode ? 'Hier tippen = neues Rennen' : 'ENTER = neues Rennen', OW / 2, 645, 42, 'center');
     }
   }
 }
@@ -1492,10 +1537,73 @@ function drawScreens() {
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  update(dt); render();
+  update(dt); render(); syncTouchUi();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
-out.addEventListener('pointerdown', () => { out.focus(); window.focus(); });
+
+// ===================== Touch-Bedienung (Handy/Tablet) =====================
+const touchEl = document.getElementById('touch'), nameInput = document.getElementById('name-input');
+function syncTouchUi() {
+  if (touchEl.hidden === touchMode) touchEl.hidden = !touchMode;
+  const r = state === 'race' || state === 'countdown' ? '1' : '0';
+  if (touchEl.dataset.race !== r) touchEl.dataset.race = r;
+}
+function wake() { initAudio(); if (actx && actx.state === 'suspended') actx.resume(); }
+function goFullscreen() {
+  const el = document.documentElement;
+  if (document.fullscreenElement || !el.requestFullscreen) return;
+  el.requestFullscreen()
+    .then(() => screen.orientation && screen.orientation.lock ? screen.orientation.lock('landscape') : null)
+    .catch(() => {});
+}
+function holdButton(id, key) {
+  const b = document.getElementById(id);
+  const set = v => { touchKeys[key] = v; b.classList.toggle('on', v); };
+  b.addEventListener('pointerdown', e => {
+    e.preventDefault(); set(true); wake();
+    try { b.setPointerCapture(e.pointerId); } catch (err) {} // Finger darf vom Knopf rutschen
+  });
+  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(ev, () => set(false));
+}
+holdButton('t-left', 'left'); holdButton('t-right', 'right'); holdButton('t-drift', 'drift'); holdButton('t-brake', 'brake');
+document.getElementById('t-item').addEventListener('pointerdown', e => {
+  e.preventDefault();
+  if (state === 'race' && !paused && player && !player.finished) useItem(player);
+});
+document.getElementById('t-menu').addEventListener('pointerdown', e => { e.preventDefault(); wake(); toggleOptions(); });
+
+// Antippen bzw. Anklicken im Menü, im Ziel und in den Ton-Optionen
+function tapAt(x, y) {
+  if (optionsOpen) {
+    const bw = 620, bh = 360, bx = (OW - bw) / 2, by = (OH - bh) / 2;
+    if (x < bx || x > bx + bw || y < by || y > by + bh) { toggleOptions(); return; }
+    const i = Math.round((y - (by + 115)) / 56);
+    if (i >= 0 && i < OPTIONS.length) { optSel = i; changeOption(i, x < bx + 420 ? -1 : 1); }
+    return;
+  }
+  const side = x < OW / 2 ? -1 : 1;
+  if (state === 'menu') {
+    if (y > 320 && y < 392 && amHost()) chooseTrack(trackIdx + side);
+    else if (y > 400 && y < 468) { nameInput.value = myName; nameInput.focus(); }
+    else if (y > 640 && amHost()) hostStart();
+  } else if (state === 'finish' && finishDelay <= 0 && amHost()) {
+    if (y > 545 && y < 600) chooseTrack(trackIdx + side);
+    else if (y > 605) hostStart();
+  }
+}
+out.addEventListener('pointerdown', e => {
+  out.focus(); window.focus();
+  if (e.pointerType === 'touch') { touchMode = true; goFullscreen(); }
+  wake();
+  const r = out.getBoundingClientRect();
+  tapAt((e.clientX - r.left) / r.width * OW, (e.clientY - r.top) / r.height * OH);
+});
+// Name über die Bildschirmtastatur
+nameInput.addEventListener('input', () => {
+  myName = nameInput.value.replace(/[^\p{L}\p{N} _.-]/gu, '').slice(0, 12);
+  saveName();
+});
+nameInput.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') nameInput.blur(); });
 out.focus();
 </script>
