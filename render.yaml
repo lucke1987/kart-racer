@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: kart-racer
+    runtime: python
+    plan: free
+    buildCommand: "echo kein Build nötig"
+    startCommand: python server.py
