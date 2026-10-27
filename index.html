@@ -40,6 +40,12 @@
   #turn { position: fixed; inset: 0; display: none; place-items: center; text-align: center; background: var(--bg); color: var(--fg);
     font: 800 italic 22px "Segoe UI", system-ui, sans-serif; padding: 24px; }
   @media (orientation: portrait) and (pointer: coarse) { #turn { display: grid; } }
+  /* Hinweis fürs iPhone: dort klappt Vollbild am zuverlässigsten als App vom Home-Bildschirm */
+  #ios-hint { position: fixed; left: 50%; transform: translateX(-50%); top: calc(8px + env(safe-area-inset-top, 0px));
+    display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 260px); padding: 8px 8px 8px 16px; border-radius: 22px;
+    background: #ffd23f; color: #111; font: 800 italic 14px "Segoe UI", system-ui, sans-serif; box-shadow: 0 4px 14px rgba(0,0,0,.4); z-index: 5; }
+  #ios-hint[hidden] { display: none; }
+  #ios-hint button { flex: none; width: 30px; height: 30px; border-radius: 50%; border: 0; background: rgba(0,0,0,.15); color: #111; font: 700 18px system-ui, sans-serif; }
   #name-input { position: fixed; left: 0; top: 0; width: 1px; height: 1px; opacity: 0; border: 0; padding: 0; font-size: 16px; }
 </style>
 <div id="wrap"><canvas id="c" width="1280" height="720" tabindex="0"></canvas></div>
@@ -55,6 +61,7 @@
   <button id="t-start">▶ RENNEN STARTEN</button>
 </div>
 <input id="name-input" maxlength="12" autocomplete="off" aria-label="Dein Name">
+<div id="ios-hint" hidden><span>Vollbild: unten auf <b>Teilen</b> ⬆️ tippen, dann <b>„Zum Home-Bildschirm“</b> – und das Spiel über das neue Symbol starten.</span><button id="ios-hint-close" aria-label="Hinweis schließen">×</button></div>
 <div id="turn">Bitte das Handy quer halten<br>📱 ↻</div>
 <script>
 'use strict';
@@ -1439,8 +1446,6 @@ function drawScreens() {
   if (state === 'menu') {
     ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(0, 0, OW, OH);
     txt('KART RACER', OW / 2, 120, 100, 'center', '#ffd23f');
-    if (touchMode && !fsSupported() && !isStandalone())
-      txt('Tipp für Vollbild: Teilen → „Zum Home-Bildschirm“', OW / 2, 28, 20, 'center', '#c8d4e4');
     txt('3 Runden, bis zu 4 Spieler – freie Plätze fahren Bots', OW / 2, 172, 26, 'center');
     const lines = touchMode
       ? ['Gas gibt das Kart von selbst: ◀ ganz links und ▶ ganz rechts lenken',
@@ -1567,6 +1572,7 @@ requestAnimationFrame(frame);
 const touchEl = document.getElementById('touch'), nameInput = document.getElementById('name-input');
 function syncTouchUi() {
   if (touchEl.hidden === touchMode) touchEl.hidden = !touchMode;
+  syncIosHint();
   const r = state === 'race' || state === 'countdown' ? '1' : '0';
   if (touchEl.dataset.race !== r) touchEl.dataset.race = r;
   const f = fsSupported() && !fsActive() ? '1' : '0';
@@ -1577,6 +1583,19 @@ function syncTouchUi() {
     touchEl.dataset.start = st;
     startBtn.textContent = state === 'finish' ? '▶ NÄCHSTES RENNEN' : '▶ RENNEN STARTEN';
   }
+}
+// iPhone/iPad (iPads melden sich teils als Mac mit Touchscreen)
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const iosHint = document.getElementById('ios-hint');
+let iosHintClosed = false;
+try { iosHintClosed = localStorage.getItem('kart.iosHint') === 'zu'; } catch (e) {}
+document.getElementById('ios-hint-close').addEventListener('click', () => {
+  iosHintClosed = true;
+  try { localStorage.setItem('kart.iosHint', 'zu'); } catch (e) {}
+});
+function syncIosHint() {
+  const show = isIOS && !isStandalone() && !iosHintClosed && state === 'menu' && !optionsOpen;
+  if (iosHint.hidden === show) iosHint.hidden = !show;
 }
 function wake() { initAudio(); if (actx && actx.state === 'suspended') actx.resume(); }
 
