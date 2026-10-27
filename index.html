@@ -660,9 +660,10 @@ const gridSlots = () => [15, 11, 7, 3].flatMap(b => [[N - b, 16], [N - b, -16]])
 const BOT_LEVELS = [
   // speed: Tempo der Bots (du fährst 150) · corner: wie stark sie vor Kurven bremsen · catchUp: maximales Aufholen
   // slowAhead: Bremse, wenn sie weit vorne liegen · turbo: Chance auf Mini-Turbo nach Kurven · pads: zielen auf Boost-Felder
-  { name: 'Leicht', col: '#6ee07a', speed: [126, 138], corner: 0.5, catchUp: 0.04, slowAhead: 0.88, turbo: 0, turboLen: 0.5, pads: false, line: 1, itemWait: [3, 7] },
-  { name: 'Mittel', col: '#ffd23f', speed: [146, 156], corner: 0.36, catchUp: 0.14, slowAhead: 0.97, turbo: 0.7, turboLen: 0.7, pads: true, line: 0.7, itemWait: [0.8, 2] },
-  { name: 'Schwer', col: '#ff6b5b', speed: [156, 168], corner: 0.27, catchUp: 0.28, slowAhead: 1, turbo: 1, turboLen: 1, pads: true, line: 0.35, itemWait: [0.2, 0.7] },
+  { name: 'Leicht', col: '#6ee07a', speed: [126, 138], corner: 0.5, catchUp: 0.04, catchRate: 1.5, turn: 1, slowAhead: 0.88, turbo: 0, turboLen: 0.5, pads: false, line: 1, itemWait: [3, 7] },
+  { name: 'Mittel', col: '#ffd23f', speed: [148, 158], corner: 0.33, catchUp: 0.3, catchRate: 2.5, turn: 1.15, slowAhead: 0.97, turbo: 0.8, turboLen: 0.8, pads: true, line: 0.7, itemWait: [0.8, 2] },
+  // Schwer passt sich an: je weiter du vorne bist, desto schneller werden die Bots (bis +70 %)
+  { name: 'Schwer', col: '#ff6b5b', speed: [160, 172], corner: 0.24, catchUp: 0.7, catchRate: 5, turn: 1.4, slowAhead: 1, turbo: 1, turboLen: 1.1, pads: true, line: 0.35, itemWait: [0.2, 0.7] },
 ];
 let botLevel = 1;
 try { const v = Number(localStorage.getItem('kart.bots')); if (v >= 0 && v <= 2) botLevel = v; } catch (e) {}
@@ -846,6 +847,7 @@ function startRace(id, grid, host, trk, lvl) {
       isPlayer: mine, human, bot: !human, botIdx: human ? -1 : botNo++,
       peer: human ? grid[i] : host, remote: human ? !mine : !hosting, gone: false, seen: false, lastPres: null,
       maxSpeed: human ? 150 : L.speed[0] + (L.speed[1] - L.speed[0]) * Math.min(1, botNo / botCount), rb: 1,
+      turnMul: human ? 1 : L.turn, // starke Bots lenken so scharf wie ein driftender Mensch
       x: p.x + p.nx * off, y: p.y + p.ny * off, a: p.ang, moveA: p.ang, speed: 0,
       tx: 0, ty: 0, ta: 0, label: null,
       boost: 0, drifting: false, driftDir: 0, driftCharge: 0, hop: 0,
@@ -1002,7 +1004,7 @@ function aiInput(k) {
   // holt umso stärker auf, je größer der Rückstand ist
   const best = Math.max(...karts.filter(o => o.human && !o.gone).map(o => o.progress), player.progress);
   const gap = k.progress - best;
-  k.rb = k.isPlayer ? 1 : gap > N / 3 ? L.slowAhead : 1 + Math.min(L.catchUp, Math.max(0, -gap - N * 0.03) / N * 1.5);
+  k.rb = k.isPlayer ? 1 : gap > N / 3 ? L.slowAhead : 1 + Math.min(L.catchUp, Math.max(0, -gap - N * 0.02) / N * L.catchRate);
   const c = Math.abs(wrapA(path[(k.idx + 14) % N].ang - path[(k.idx + 2) % N].ang));
   const target = k.maxSpeed * k.rb * (1 - Math.min(0.4, c * L.corner));
   // Mini-Turbo am Kurvenausgang, wie beim Driften
@@ -1051,7 +1053,7 @@ function updateKart(k, inp, dt) {
       k.driftCharge += dt * (0.8 + 0.6 * Math.max(0, s));
     }
   }
-  if (!k.drifting) k.a += inp.steer * TURN * Math.min(1, Math.abs(k.speed) / 50) * Math.sign(k.speed) * dt;
+  if (!k.drifting) k.a += inp.steer * TURN * (k.turnMul || 1) * Math.min(1, Math.abs(k.speed) / 50) * Math.sign(k.speed) * dt;
   k.a = wrapA(k.a);
 
   const grip = k.drifting ? 4 : 12;
