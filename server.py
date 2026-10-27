@@ -29,6 +29,26 @@ IDLE_TIMEOUT = 60          # Sekunden ohne Nachricht, dann gilt die Verbindung a
 
 rooms: dict[str, dict[str, "Client"]] = {}
 
+# Damit man das Spiel am Handy als App auf den Startbildschirm legen kann (startet dann im Vollbild, quer)
+MANIFEST = json.dumps({
+    "name": "Kart Racer", "short_name": "Kart Racer", "start_url": "./", "scope": "./",
+    "display": "fullscreen", "orientation": "landscape",
+    "background_color": "#0d0f14", "theme_color": "#0d0f14",
+    "icons": [{"src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"}],
+}).encode()
+ICON = b"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<rect width="512" height="512" rx="96" fill="#0d0f14"/>
+<path d="M0 360h512v152H0z" fill="#65656e"/>
+<path d="M60 430h80M216 430h80M372 430h80" stroke="#fff" stroke-width="14"/>
+<rect x="118" y="250" width="276" height="96" rx="40" fill="#e53935"/>
+<rect x="80" y="300" width="70" height="90" rx="22" fill="#151515"/>
+<rect x="362" y="300" width="70" height="90" rx="22" fill="#151515"/>
+<rect x="96" y="214" width="320" height="36" rx="18" fill="#ff6f60"/>
+<circle cx="256" cy="168" r="70" fill="#ffffff"/>
+<rect x="244" y="98" width="24" height="120" rx="12" fill="#e53935"/>
+<path d="M150 64l30 40M362 64l-30 40" stroke="#ffd23f" stroke-width="16" stroke-linecap="round"/>
+</svg>"""
+
 
 class Client:
     def __init__(self, writer: asyncio.StreamWriter, room: str):
@@ -157,6 +177,12 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> 
             writer.write(
                 b"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n"
                 b"Cache-Control: no-cache\r\nContent-Length: %d\r\nConnection: close\r\n\r\n" % len(body)
+                + (body if method == "GET" else b"")
+            )
+        elif method in ("GET", "HEAD") and url.path in ("/manifest.webmanifest", "/icon.svg"):
+            body, ctype = (MANIFEST, b"application/manifest+json") if url.path.endswith("webmanifest") else (ICON, b"image/svg+xml")
+            writer.write(
+                b"HTTP/1.1 200 OK\r\nContent-Type: " + ctype + b"\r\nContent-Length: %d\r\nConnection: close\r\n\r\n" % len(body)
                 + (body if method == "GET" else b"")
             )
         else:

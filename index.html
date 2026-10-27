@@ -1,6 +1,11 @@
 <title>Kart Racer</title>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d0f14">
+<link rel="manifest" href="manifest.webmanifest">
 <style>
   /* Einzelner, bewusst dunkler Arcade-Look: Spielfläche zentriert auf schwarzem Grund */
   :root { --bg: #0d0f14; --btn: rgba(20, 24, 34, .45); --btn-on: rgba(255, 210, 63, .75); --btn-line: rgba(255, 255, 255, .7); --fg: #fff; color-scheme: dark; }
@@ -9,7 +14,8 @@
   #wrap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
   canvas { width: min(100vw, 177.78vh); height: min(56.25vw, 100vh); outline: none; }
 
-  /* Touch-Steuerung fürs Handy: links lenken, rechts Drift/Item/Bremse, Gas geht automatisch */
+  /* Touch-Steuerung fürs Handy: ◀ ganz links, ▶ ganz rechts, daneben jeweils DRIFT,
+     darüber ITEM (links) und BREMSE (rechts). Gas geht automatisch. */
   #touch { position: fixed; inset: 0; pointer-events: none; font: 800 italic 15px "Segoe UI", system-ui, sans-serif; color: var(--fg); }
   #touch button { pointer-events: auto; touch-action: none; position: absolute; border: 3px solid var(--btn-line); border-radius: 50%;
     background: var(--btn); color: var(--fg); font: inherit; width: 84px; height: 84px; padding: 0; display: grid; place-items: center; }
@@ -19,15 +25,18 @@
     width: auto !important; height: 50px !important; padding: 0 34px !important; border-radius: 28px !important;
     background: #ffd23f !important; color: #111 !important; font-size: 22px !important; border-color: #fff !important; }
   #touch[data-start="0"] #t-start { display: none; }
-  #touch .drive { bottom: calc(18px + env(safe-area-inset-bottom, 0px)); }
-  #t-left  { left: calc(18px + env(safe-area-inset-left, 0px)); font-size: 34px !important; }
-  #t-right { left: calc(116px + env(safe-area-inset-left, 0px)); font-size: 34px !important; }
-  #t-drift { right: calc(18px + env(safe-area-inset-right, 0px)); width: 96px !important; height: 96px !important; }
-  #t-item  { right: calc(126px + env(safe-area-inset-right, 0px)); }
-  #t-brake { right: calc(30px + env(safe-area-inset-right, 0px)); bottom: calc(128px + env(safe-area-inset-bottom, 0px)) !important; width: 64px !important; height: 64px !important; font-size: 13px !important; }
-  #t-menu  { left: calc(10px + env(safe-area-inset-left, 0px)); top: calc(10px + env(safe-area-inset-top, 0px));
-    width: 48px !important; height: 48px !important; font-size: 22px !important; }
+  #touch .drive { bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+  #t-left    { left: calc(14px + env(safe-area-inset-left, 0px)); width: 92px !important; height: 92px !important; font-size: 36px !important; }
+  #t-right   { right: calc(14px + env(safe-area-inset-right, 0px)); width: 92px !important; height: 92px !important; font-size: 36px !important; }
+  #t-drift-l { left: calc(118px + env(safe-area-inset-left, 0px)); width: 74px !important; height: 74px !important; font-size: 13px !important; }
+  #t-drift-r { right: calc(118px + env(safe-area-inset-right, 0px)); width: 74px !important; height: 74px !important; font-size: 13px !important; }
+  #t-item    { left: calc(24px + env(safe-area-inset-left, 0px)); bottom: calc(122px + env(safe-area-inset-bottom, 0px)) !important; width: 70px !important; height: 70px !important; }
+  #t-brake   { right: calc(28px + env(safe-area-inset-right, 0px)); bottom: calc(122px + env(safe-area-inset-bottom, 0px)) !important; width: 64px !important; height: 64px !important; font-size: 12px !important; }
+  #t-menu, #t-full { top: calc(10px + env(safe-area-inset-top, 0px)); width: 48px !important; height: 48px !important; font-size: 22px !important; }
+  #t-menu  { left: calc(10px + env(safe-area-inset-left, 0px)); }
+  #t-full  { left: calc(66px + env(safe-area-inset-left, 0px)); }
   #touch[data-race="1"] #t-menu { top: auto; left: 50%; transform: translateX(-50%); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+  #touch[data-race="1"] #t-full, #touch[data-full="0"] #t-full { display: none; }
   #turn { position: fixed; inset: 0; display: none; place-items: center; text-align: center; background: var(--bg); color: var(--fg);
     font: 800 italic 22px "Segoe UI", system-ui, sans-serif; padding: 24px; }
   @media (orientation: portrait) and (pointer: coarse) { #turn { display: grid; } }
@@ -36,11 +45,13 @@
 <div id="wrap"><canvas id="c" width="1280" height="720" tabindex="0"></canvas></div>
 <div id="touch" hidden>
   <button id="t-left" class="drive" aria-label="Links lenken">◀</button>
-  <button id="t-right" class="drive" aria-label="Rechts lenken">▶</button>
+  <button id="t-drift-l" class="drive" aria-label="Driften">DRIFT</button>
   <button id="t-item" class="drive" aria-label="Item benutzen">ITEM</button>
-  <button id="t-drift" class="drive" aria-label="Driften">DRIFT</button>
+  <button id="t-right" class="drive" aria-label="Rechts lenken">▶</button>
+  <button id="t-drift-r" class="drive" aria-label="Driften">DRIFT</button>
   <button id="t-brake" class="drive" aria-label="Bremsen">BREMSE</button>
   <button id="t-menu" aria-label="Ton-Optionen">⚙</button>
+  <button id="t-full" aria-label="Vollbild">⛶</button>
   <button id="t-start">▶ RENNEN STARTEN</button>
 </div>
 <input id="name-input" maxlength="12" autocomplete="off" aria-label="Dein Name">
@@ -1428,10 +1439,12 @@ function drawScreens() {
   if (state === 'menu') {
     ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(0, 0, OW, OH);
     txt('KART RACER', OW / 2, 120, 100, 'center', '#ffd23f');
+    if (touchMode && !fsSupported() && !isStandalone())
+      txt('Tipp für Vollbild: Teilen → „Zum Home-Bildschirm“', OW / 2, 28, 20, 'center', '#c8d4e4');
     txt('3 Runden, bis zu 4 Spieler – freie Plätze fahren Bots', OW / 2, 172, 26, 'center');
     const lines = touchMode
-      ? ['Gas gibt das Kart von selbst, links unten lenkst du',
-         'DRIFT halten + lenken, loslassen = Turbo',
+      ? ['Gas gibt das Kart von selbst: ◀ ganz links und ▶ ganz rechts lenken',
+         'DRIFT (neben den Pfeilen) halten + lenken, loslassen = Turbo',
          '?-Boxen einsammeln, ITEM = benutzen      ⚙ = Ton-Optionen']
       : ['Pfeiltasten oder WASD: Gas, Bremse, Lenken',
          'LEERTASTE halten + lenken = Drift, loslassen = Turbo',
@@ -1556,6 +1569,8 @@ function syncTouchUi() {
   if (touchEl.hidden === touchMode) touchEl.hidden = !touchMode;
   const r = state === 'race' || state === 'countdown' ? '1' : '0';
   if (touchEl.dataset.race !== r) touchEl.dataset.race = r;
+  const f = fsSupported() && !fsActive() ? '1' : '0';
+  if (touchEl.dataset.full !== f) touchEl.dataset.full = f;
   // Start-Knopf nur für den Host, im Menü und nach dem Ziel
   const st = !optionsOpen && amHost() && (state === 'menu' || (state === 'finish' && finishDelay <= 0)) ? '1' : '0';
   if (touchEl.dataset.start !== st) {
@@ -1563,29 +1578,47 @@ function syncTouchUi() {
     startBtn.textContent = state === 'finish' ? '▶ NÄCHSTES RENNEN' : '▶ RENNEN STARTEN';
   }
 }
+function wake() { initAudio(); if (actx && actx.state === 'suspended') actx.resume(); }
+
+// Vollbild: Browser erlauben das nur direkt aus einem Antippen heraus ("click", nicht schon beim
+// Aufsetzen des Fingers). iPhones kennen kein Vollbild für Webseiten – dort hilft "Zum Home-Bildschirm".
+const fsSupported = () => !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+const fsActive = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+const isStandalone = () => matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || navigator.standalone === true;
+function goFullscreen() {
+  if (fsActive() || !fsSupported() || isStandalone()) return;
+  const el = document.documentElement, req = el.requestFullscreen || el.webkitRequestFullscreen;
+  try {
+    Promise.resolve(req.call(el, { navigationUI: 'hide' }))
+      .then(() => screen.orientation && screen.orientation.lock ? screen.orientation.lock('landscape') : null)
+      .catch(() => {});
+  } catch (e) {}
+}
+
 const startBtn = document.getElementById('t-start');
-startBtn.addEventListener('pointerdown', e => {
-  e.preventDefault(); wake();
+startBtn.addEventListener('click', () => {
+  wake(); goFullscreen();
   if (amHost() && (state === 'menu' || (state === 'finish' && finishDelay <= 0))) hostStart();
 });
-function wake() { initAudio(); if (actx && actx.state === 'suspended') actx.resume(); }
-function goFullscreen() {
-  const el = document.documentElement;
-  if (document.fullscreenElement || !el.requestFullscreen) return;
-  el.requestFullscreen()
-    .then(() => screen.orientation && screen.orientation.lock ? screen.orientation.lock('landscape') : null)
-    .catch(() => {});
-}
+document.getElementById('t-full').addEventListener('click', () => { wake(); goFullscreen(); });
+
+// Halte-Knöpfe; mehrere Knöpfe können dieselbe Aktion auslösen (DRIFT gibt es links und rechts)
+const heldButtons = {};
 function holdButton(id, key) {
   const b = document.getElementById(id);
-  const set = v => { touchKeys[key] = v; b.classList.toggle('on', v); };
+  const set = v => {
+    heldButtons[id] = v; b.classList.toggle('on', v);
+    touchKeys[key] = Object.keys(heldButtons).some(k => heldButtons[k] && document.getElementById(k).dataset.key === key);
+  };
+  b.dataset.key = key;
   b.addEventListener('pointerdown', e => {
     e.preventDefault(); set(true); wake();
     try { b.setPointerCapture(e.pointerId); } catch (err) {} // Finger darf vom Knopf rutschen
   });
   for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(ev, () => set(false));
 }
-holdButton('t-left', 'left'); holdButton('t-right', 'right'); holdButton('t-drift', 'drift'); holdButton('t-brake', 'brake');
+holdButton('t-left', 'left'); holdButton('t-right', 'right');
+holdButton('t-drift-l', 'drift'); holdButton('t-drift-r', 'drift'); holdButton('t-brake', 'brake');
 document.getElementById('t-item').addEventListener('pointerdown', e => {
   e.preventDefault();
   if (state === 'race' && !paused && player && !player.finished) useItem(player);
@@ -1613,7 +1646,10 @@ function tapAt(x, y) {
 }
 out.addEventListener('pointerdown', e => {
   out.focus(); window.focus();
-  if (e.pointerType === 'touch') { touchMode = true; goFullscreen(); }
+  if (e.pointerType === 'touch') touchMode = true;
+});
+// "click" statt "pointerdown": nur so öffnet sich am Handy die Tastatur für den Namen
+out.addEventListener('click', e => {
   wake();
   const r = out.getBoundingClientRect();
   tapAt((e.clientX - r.left) / r.width * OW, (e.clientY - r.top) / r.height * OH);
