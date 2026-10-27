@@ -35,7 +35,9 @@
   #t-menu, #t-full { top: calc(10px + env(safe-area-inset-top, 0px)); width: 48px !important; height: 48px !important; font-size: 22px !important; }
   #t-menu  { left: calc(10px + env(safe-area-inset-left, 0px)); }
   #t-full  { left: calc(66px + env(safe-area-inset-left, 0px)); }
-  #touch[data-race="1"] #t-menu { top: auto; left: 50%; transform: translateX(-50%); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+  #touch[data-race="1"] #t-menu, #touch[data-race="0"] #t-pause { display: none; }
+  #t-pause { left: 50%; transform: translateX(-50%); bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    width: 52px !important; height: 52px !important; font-size: 20px !important; }
   #touch[data-race="1"] #t-full, #touch[data-full="0"] #t-full { display: none; }
   #turn { position: fixed; inset: 0; display: none; place-items: center; text-align: center; background: var(--bg); color: var(--fg);
     font: 800 italic 22px "Segoe UI", system-ui, sans-serif; padding: 24px; }
@@ -79,6 +81,7 @@
   <button id="t-drift-r" class="drive" aria-label="Driften">DRIFT</button>
   <button id="t-brake" class="drive" aria-label="Bremsen">BREMSE</button>
   <button id="t-menu" aria-label="Ton-Optionen">⚙</button>
+  <button id="t-pause" aria-label="Pausenmenü">❚❚</button>
   <button id="t-full" aria-label="Vollbild">⛶</button>
   <button id="t-start">▶ RENNEN STARTEN</button>
 </div>
@@ -790,7 +793,8 @@ function netTick(dt) {
     if (!src) continue;
     if (k.human) k.name = peerName(src);
     const pres = src.presence;
-    if (pres === k.lastPres || pres.rid !== raceId) continue;
+    if (pres.rid !== raceId) { if (k.seen) k.gone = true; continue; } // hat das Rennen verlassen
+    if (pres === k.lastPres) continue;
     k.lastPres = pres;
     const s = k.bot ? (Array.isArray(pres.b) ? pres.b[k.botIdx] : null) : pres.k;
     if (Array.isArray(s)) applyRemote(k, s);
@@ -824,7 +828,7 @@ function startRace(id, grid, host, trk) {
       slot: i, item: null, roll: 0, rollItem: null, itemDelay: 0, spin: 0, spinVis: 0, small: 0,
     };
   });
-  placeBoxes(); shells = []; remoteShells.clear(); peerPres.clear(); outEvents = []; zapFlash = 0;
+  placeBoxes(); shells = []; remoteShells.clear(); peerPres.clear(); outEvents = []; zapFlash = 0; escMenu = false;
   player = karts.find(k => k.isPlayer);
   cam.a = player.a; placeCam(1);
   state = 'countdown'; countdown = 3.99; raceTime = 0; paused = false; msg = ''; msgT = 0; particles = [];
@@ -864,6 +868,26 @@ function editName(e) {
   }
   return false;
 }
+// Pausenmenü (Esc/P): allein wird dabei angehalten, im Mehrspieler läuft das Rennen weiter
+let escMenu = false, pauseButtons = [];
+function toggleEscMenu(open = !escMenu) {
+  escMenu = open;
+  if (soloRace()) paused = open;
+}
+// zurück ins Hauptmenü: Rennen verlassen, Mitspieler sehen das Kart verschwinden
+function goToMenu() {
+  escMenu = false; paused = false; optionsOpen = false; pausedByOptions = false;
+  state = 'menu'; karts = []; player = null;
+  shells = []; particles = []; remoteShells.clear(); outEvents = []; msgT = 0; sendT = 0;
+  if (trackIdx !== builtTrack) buildTrack(trackIdx);
+}
+function pauseAction(id) {
+  if (id === 'resume') toggleEscMenu(false);
+  else if (id === 'restart') hostStart();
+  else if (id === 'sound') toggleOptions();
+  else if (id === 'menu') goToMenu();
+}
+
 // Ton-Optionen: TAB öffnet/schließt, ↑↓ wählen, ←→ ändern
 let optionsOpen = false, optSel = 0, pausedByOptions = false;
 const OPTIONS = [
@@ -906,12 +930,13 @@ addEventListener('keydown', e => {
   if ((e.code === 'ArrowLeft' || e.code === 'ArrowRight') && (state === 'menu' || (state === 'finish' && finishDelay <= 0)) && amHost())
     chooseTrack(trackIdx + (e.code === 'ArrowLeft' ? -1 : 1));
   if (e.repeat) return;
-  if ((e.code === 'KeyE' || e.code === 'KeyX') && state === 'race' && !paused && player && !player.finished) useItem(player);
+  if ((e.code === 'KeyE' || e.code === 'KeyX') && state === 'race' && !paused && !escMenu && player && !player.finished) useItem(player);
   if (e.code === 'Enter') {
     initAudio(); if (actx && actx.state === 'suspended') actx.resume();
     if ((state === 'menu' || (state === 'finish' && finishDelay <= 0)) && amHost()) hostStart();
   }
-  if ((e.code === 'KeyP' || e.code === 'Escape') && soloRace() && (state === 'race' || state === 'countdown')) paused = !paused;
+  if ((e.code === 'KeyP' || e.code === 'Escape') && (state === 'race' || state === 'countdown')) toggleEscMenu();
+  if (e.code === 'KeyH' && (escMenu || state === 'finish')) goToMenu();
   if (e.code === 'KeyR' && state !== 'menu' && soloRace() && amHost()) hostStart();
   if (e.code === 'KeyM' && state !== 'menu') { muted = !muted; saveSound(); }
 });
@@ -923,7 +948,7 @@ let touchMode = matchMedia('(pointer: coarse)').matches;
 const touchKeys = { left: false, right: false, drift: false, brake: false };
 
 function playerInput() {
-  if (optionsOpen) return { gas: false, brake: false, steer: 0, drift: false };
+  if (optionsOpen || escMenu) return { gas: false, brake: false, steer: 0, drift: false };
   const brake = !!(keys.ArrowDown || keys.KeyS || touchKeys.brake);
   return {
     gas: !!(keys.ArrowUp || keys.KeyW || (touchMode && !brake)),
@@ -1573,11 +1598,7 @@ function drawScreens() {
     txt(track.name, OW / 2, OH / 2 + 110, 40, 'center', '#ffe9a0');
   }
   if (msgT > 0 && state !== 'finish') txt(msg, OW / 2, OH / 2 - 40, msg === 'LOS!' ? 150 : 80, 'center', msg === 'LOS!' ? '#3f3' : '#ffd23f');
-  if (paused) {
-    ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(0, 0, OW, OH);
-    txt('PAUSE', OW / 2, OH / 2, 110, 'center');
-    txt(touchMode ? '⚙ antippen = weiter' : 'P = weiter     R = Neustart', OW / 2, OH / 2 + 60, 30, 'center');
-  }
+  if (escMenu) drawPauseMenu();
   if (state === 'finish') {
     txt('ZIEL!', OW / 2, 150, 120, 'center', '#ffd23f');
     if (finishDelay <= 0) {
@@ -1593,8 +1614,31 @@ function drawScreens() {
       txt(host ? `◀  Nächste Strecke: ${next}  ▶` : `Nächste Strecke: ${next}`, OW / 2, 580, 30, 'center', '#ffe9a0');
       if (!host) txt(`Warte, bis ${peerName(hostPeer())} das nächste Rennen startet …`, OW / 2, 640, 30, 'center');
       else if (!touchMode && Math.floor(time * 2) % 2 === 0) txt('ENTER = neues Rennen', OW / 2, 645, 42, 'center');
+      txt(touchMode ? '≡ Hauptmenü' : 'H = Hauptmenü', 30, OH - 26, 28, 'left', '#c8d4e4');
     }
   }
+}
+
+function drawPauseMenu() {
+  const solo = soloRace();
+  ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(0, 0, OW, OH);
+  txt(solo ? 'PAUSE' : 'MENÜ', OW / 2, 250, 100, 'center');
+  if (!solo) txt('Das Rennen läuft weiter, dein Kart rollt aus', OW / 2, 295, 24, 'center', '#c8d4e4');
+  const items = [['resume', 'Weiter']];
+  if (solo && amHost()) items.push(['restart', 'Neustart']);
+  items.push(['sound', 'Ton'], ['menu', 'Hauptmenü']);
+  const bw = 210, bh = 76, gap = 22, total = items.length * bw + (items.length - 1) * gap;
+  pauseButtons = items.map(([id, label], i) => {
+    const x = (OW - total) / 2 + i * (bw + gap), y = 340;
+    ctx.fillStyle = id === 'resume' ? '#ffd23f' : 'rgba(20,24,34,.85)'; ctx.fillRect(x, y, bw, bh);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.strokeRect(x, y, bw, bh);
+    if (id === 'resume') { // dunkle Schrift ohne Kontur auf dem gelben Knopf
+      ctx.font = 'italic 900 32px "Segoe UI", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#111';
+      ctx.fillText(label, x + bw / 2, y + 50);
+    } else txt(label, x + bw / 2, y + 50, 32, 'center', '#fff');
+    return { id, x, y, w: bw, h: bh };
+  });
+  if (!touchMode) txt(`Esc = weiter     ${solo && amHost() ? 'R = Neustart     ' : ''}TAB = Ton     H = Hauptmenü`, OW / 2, 490, 24, 'center', '#c8d4e4');
 }
 
 // ===================== Hauptschleife =====================
@@ -1679,9 +1723,10 @@ holdButton('t-left', 'left'); holdButton('t-right', 'right');
 holdButton('t-drift-l', 'drift'); holdButton('t-drift-r', 'drift'); holdButton('t-brake', 'brake');
 document.getElementById('t-item').addEventListener('pointerdown', e => {
   e.preventDefault();
-  if (state === 'race' && !paused && player && !player.finished) useItem(player);
+  if (state === 'race' && !paused && !escMenu && player && !player.finished) useItem(player);
 });
 document.getElementById('t-menu').addEventListener('pointerdown', e => { e.preventDefault(); wake(); toggleOptions(); });
+document.getElementById('t-pause').addEventListener('pointerdown', e => { e.preventDefault(); toggleEscMenu(); });
 
 // Antippen bzw. Anklicken im Menü, im Ziel und in den Ton-Optionen
 function tapAt(x, y) {
@@ -1692,6 +1737,12 @@ function tapAt(x, y) {
     if (i >= 0 && i < OPTIONS.length) { optSel = i; changeOption(i, x < bx + 420 ? -1 : 1); }
     return;
   }
+  if (escMenu) {
+    const b = pauseButtons.find(b => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h);
+    if (b) pauseAction(b.id);
+    return;
+  }
+  if (state === 'finish' && finishDelay <= 0 && x < 330 && y > OH - 70) { goToMenu(); return; }
   const side = x < OW / 2 ? -1 : 1;
   if (state === 'menu') {
     if (y > 320 && y < 392 && amHost()) chooseTrack(trackIdx + side);
