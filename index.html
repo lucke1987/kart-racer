@@ -642,12 +642,32 @@ const cam = { x: 0, y: 0, a: 0 };
 
 // Startplatz-Farben; freie Plätze fahren Bots mit diesen Namen
 const SLOT_LOOK = [
-  { body: '#e53935', helmet: '#ffffff', bot: 'Flitzer', speed: 139 },
-  { body: '#1e88e5', helmet: '#ffffff', bot: 'Blitz',   speed: 137 },
-  { body: '#43a047', helmet: '#ffeb3b', bot: 'Turbo',   speed: 141 },
-  { body: '#fdd835', helmet: '#e53935', bot: 'Rakete',  speed: 145 },
+  { body: '#e53935', helmet: '#ffffff', bot: 'Flitzer' },
+  { body: '#1e88e5', helmet: '#ffffff', bot: 'Blitz' },
+  { body: '#43a047', helmet: '#ffeb3b', bot: 'Turbo' },
+  { body: '#fdd835', helmet: '#e53935', bot: 'Rakete' },
+  { body: '#8e44ad', helmet: '#ffffff', bot: 'Komet' },
+  { body: '#fb8c00', helmet: '#1e88e5', bot: 'Flamme' },
+  { body: '#00acc1', helmet: '#fdd835', bot: 'Welle' },
+  { body: '#ec407a', helmet: '#ffffff', bot: 'Wirbel' },
 ];
-const gridSlots = () => [[N - 7, 16], [N - 7, -16], [N - 3, 16], [N - 3, -16]]; // Menschen starten hinten
+const MAX_KARTS = SLOT_LOOK.length;
+// Startaufstellung in Zweierreihen, von hinten nach vorne – Menschen starten hinten
+const gridSlots = () => [15, 11, 7, 3].flatMap(b => [[N - b, 16], [N - b, -16]]);
+
+// Stärke der Bots: Tempo (vom langsamsten bis zum schnellsten Bot), wie mutig sie in Kurven fahren,
+// wie stark sie aufholen, ob sie Mini-Turbos aus Kurven mitnehmen und wie schnell sie Items einsetzen
+const BOT_LEVELS = [
+  { name: 'Leicht', col: '#6ee07a', speed: [126, 138], corner: 0.5, catchUp: 1.03, slowAhead: 0.88, turbo: 0, itemWait: [3, 7] },
+  { name: 'Mittel', col: '#ffd23f', speed: [138, 148], corner: 0.42, catchUp: 1.08, slowAhead: 0.94, turbo: 0.35, itemWait: [1, 3] },
+  { name: 'Schwer', col: '#ff6b5b', speed: [147, 156], corner: 0.34, catchUp: 1.12, slowAhead: 1, turbo: 0.8, itemWait: [0.3, 1.2] },
+];
+let botLevel = 1;
+try { const v = Number(localStorage.getItem('kart.bots')); if (v >= 0 && v <= 2) botLevel = v; } catch (e) {}
+function chooseBotLevel(v) {
+  botLevel = clamp(v, 0, BOT_LEVELS.length - 1); sendT = 0;
+  try { localStorage.setItem('kart.bots', String(botLevel)); } catch (e) {}
+}
 for (const d of SLOT_LOOK) d.spr = kartSprites(d.body, d.helmet);
 
 // ===================== Mehrspieler =====================
@@ -764,8 +784,8 @@ function sendPresence() {
     rid: inRace ? raceId : null,
     k: inRace ? enc(player) : null,
     b: hosting ? karts.filter(k => k.bot).map(enc) : null,
-    race: hosting ? { id: raceId, grid: raceGrid, track: builtTrack } : null,
-    track: trackIdx,
+    race: hosting ? { id: raceId, grid: raceGrid, track: builtTrack, bots: botLevel } : null,
+    track: trackIdx, bots: botLevel,
     ev: inRace ? outEvents.map(e => [e.ev.id, e.ev.t, e.ev.s]) : null,
     pr: inRace ? shells.map(s => [s.id, s.kind === 'red' ? 1 : 0, Math.round(s.x), Math.round(s.y), Math.round(s.vx), Math.round(s.vy)]) : null,
   }).catch(() => {});
@@ -781,9 +801,11 @@ function netTick(dt) {
   if (h && !(h.isMe && h.sameTab) && (state === 'menu' || state === 'finish')) {
     const r = h.presence.race;
     if (r && typeof r.id === 'string' && r.id !== lastRaceId && Array.isArray(r.grid) && r.grid.includes(myPeer))
-      startRace(r.id, r.grid.slice(0, 4).map(String), h.peer, r.track);
+      startRace(r.id, r.grid.slice(0, MAX_KARTS).map(String), h.peer, r.track, r.bots);
     else if (Number.isInteger(h.presence.track) && h.presence.track !== trackIdx
              && h.presence.track >= 0 && h.presence.track < TRACKS.length) chooseTrack(h.presence.track);
+    const hb = h.presence.bots;
+    if (Number.isInteger(hb) && hb >= 0 && hb < BOT_LEVELS.length) botLevel = hb;
   }
   // Zustände der anderen Karts übernehmen
   for (const k of karts) {
@@ -804,7 +826,9 @@ function netTick(dt) {
   if (sendT <= 0) { sendT = 0.05; sendPresence(); }
 }
 
-function startRace(id, grid, host, trk) {
+function startRace(id, grid, host, trk, lvl) {
+  if (Number.isInteger(lvl) && lvl >= 0 && lvl < BOT_LEVELS.length) botLevel = lvl;
+  const L = BOT_LEVELS[botLevel], botCount = Math.max(1, MAX_KARTS - grid.length - 1);
   trk = clamp(Number.isInteger(trk) ? trk : 0, 0, TRACKS.length - 1);
   trackIdx = trk;
   if (trk !== builtTrack) buildTrack(trk);
@@ -819,7 +843,7 @@ function startRace(id, grid, host, trk) {
       name: mine ? displayName() : human ? 'Spieler' : d.bot, col: d.body, spr: d.spr,
       isPlayer: mine, human, bot: !human, botIdx: human ? -1 : botNo++,
       peer: human ? grid[i] : host, remote: human ? !mine : !hosting, gone: false, seen: false, lastPres: null,
-      maxSpeed: human ? 150 : d.speed, rb: 1,
+      maxSpeed: human ? 150 : L.speed[0] + (L.speed[1] - L.speed[0]) * Math.min(1, botNo / botCount), rb: 1,
       x: p.x + p.nx * off, y: p.y + p.ny * off, a: p.ang, moveA: p.ang, speed: 0,
       tx: 0, ty: 0, ta: 0, label: null,
       boost: 0, drifting: false, driftDir: 0, driftCharge: 0, hop: 0,
@@ -840,10 +864,10 @@ function hostStart() {
   if (room && myPeer !== 'local') {
     const others = viewers()
       .filter(p => !(p.isMe && p.sameTab) && ['lobby', 'finish'].includes(p.presence.mode))
-      .sort((a, b) => a.peer < b.peer ? -1 : 1).slice(0, 3);
+      .sort((a, b) => a.peer < b.peer ? -1 : 1).slice(0, MAX_KARTS - 1);
     grid = [myPeer, ...others.map(p => p.peer)];
   }
-  startRace(Math.random().toString(36).slice(2, 10), grid, myPeer, trackIdx);
+  startRace(Math.random().toString(36).slice(2, 10), grid, myPeer, trackIdx, botLevel);
 }
 
 // Streckenwahl (nur der Host); im Menü wird die Vorschau kurz verzögert neu aufgebaut
@@ -927,6 +951,8 @@ addEventListener('keydown', e => {
   if (e.code === 'Tab' && !e.repeat) { toggleOptions(); return; }
   if (optionsOpen) { optionsKey(e); return; }
   if (state === 'menu' && editName(e)) return;
+  if ((e.code === 'ArrowUp' || e.code === 'ArrowDown') && state === 'menu' && amHost())
+    chooseBotLevel(botLevel + (e.code === 'ArrowUp' ? 1 : -1));
   if ((e.code === 'ArrowLeft' || e.code === 'ArrowRight') && (state === 'menu' || (state === 'finish' && finishDelay <= 0)) && amHost())
     chooseTrack(trackIdx + (e.code === 'ArrowLeft' ? -1 : 1));
   if (e.repeat) return;
@@ -960,16 +986,23 @@ function playerInput() {
 
 // Computergegner: fahren den Wegpunkten hinterher und bremsen vor Kurven
 function aiInput(k) {
+  const L = BOT_LEVELS[botLevel];
   const look = k.speed > 100 ? 10 : 7;
   const tp = path[(k.idx + look) % N];
-  const off = k.laneOff + Math.sin(time * 0.5 + k.phase) * 10;
+  const off = (k.laneOff + Math.sin(time * 0.5 + k.phase) * 10) * (botLevel === 2 ? 0.5 : 1); // starke Bots fahren sauberere Linien
   const desired = Math.atan2(tp.y + tp.ny * off - k.y, tp.x + tp.nx * off - k.x);
   const d = wrapA(desired - k.a);
-  // Gummiband: wer weit vorne ist, wird etwas langsamer – und umgekehrt
-  const gap = k.progress - player.progress;
-  k.rb = k.isPlayer ? 1 : gap > N / 3 ? 0.92 : gap < -N / 4 ? 1.08 : 1;
+  // Gummiband gegenüber dem besten Menschen: wer weit vorne ist, wird langsamer – wer hinten ist, holt auf
+  const best = Math.max(...karts.filter(o => o.human && !o.gone).map(o => o.progress), player.progress);
+  const gap = k.progress - best;
+  k.rb = k.isPlayer ? 1 : gap > N / 3 ? L.slowAhead : gap < -N / 4 ? L.catchUp : 1;
   const c = Math.abs(wrapA(path[(k.idx + 14) % N].ang - path[(k.idx + 2) % N].ang));
-  const target = k.maxSpeed * k.rb * (1 - Math.min(0.4, c * 0.45));
+  const target = k.maxSpeed * k.rb * (1 - Math.min(0.4, c * L.corner));
+  // Mini-Turbo am Kurvenausgang, wie beim Driften
+  if (!k.isPlayer) {
+    if (c > 0.6) k.curvy = true;
+    else if (k.curvy && c < 0.25) { k.curvy = false; if (Math.random() < L.turbo) k.boost = Math.max(k.boost, 0.6); }
+  }
   return { gas: k.speed < target, brake: k.speed > target + 20, steer: clamp(d * 2.5, -1, 1), drift: false };
 }
 
@@ -1119,7 +1152,8 @@ function nearestIdx(idx, x, y) {
 }
 
 function rollItem(k) {
-  const w = ITEM_ODDS[clamp(ranking().indexOf(k), 0, 3)];
+  const rk = ranking(); // Platzierung auf die 4 Stufen (vorne … hinten) umrechnen
+  const w = ITEM_ODDS[Math.min(3, Math.floor(Math.max(0, rk.indexOf(k)) / Math.max(1, rk.length) * 4))];
   let r = Math.random() * w.reduce((a, b) => a + b, 0);
   for (let i = 0; i < ITEMS.length; i++) if ((r -= w[i]) < 0) return ITEMS[i];
   return 'mushroom';
@@ -1132,7 +1166,8 @@ function updateBoxes(dt) {
       if (k.remote || k.gone || (k.x - b.x) ** 2 + (k.y - b.y) ** 2 > 11 ** 2) continue;
       b.respawn = 3;
       if (!k.item && k.roll <= 0) {
-        k.roll = 1.2; k.rollItem = rollItem(k); k.itemDelay = 1 + Math.random() * 3;
+        const iw = BOT_LEVELS[botLevel].itemWait;
+        k.roll = 1.2; k.rollItem = rollItem(k); k.itemDelay = iw[0] + Math.random() * (iw[1] - iw[0]);
         if (k.isPlayer) beep(990, 0.08, 'square', 0.05);
       }
       break;
@@ -1193,6 +1228,7 @@ function updateShells(dt) {
 function aiItems(k, dt) {
   if (!k.item || k.finished || (k.itemDelay -= dt) > 0) return;
   const pos = ranking().indexOf(k);
+  if (botLevel === 0 && Math.random() < 0.5) { k.itemDelay = 2; return; } // leichte Bots trödeln
   const straight = Math.abs(wrapA(path[(k.idx + 15) % N].ang - path[k.idx].ang)) < 0.25;
   if ((k.item === 'mushroom' && straight) || (k.item === 'green' && straight)
       || (k.item === 'red' && pos > 0) || (k.item === 'lightning' && pos > 0) || k.itemDelay < -6) useItem(k);
@@ -1233,7 +1269,7 @@ function netItems(ps) {
     for (const e of Array.isArray(pres.ev) ? pres.ev : []) {
       if (!Array.isArray(e) || typeof e[0] !== 'string' || seenEvents.has(e[0])) continue;
       const s = Number(e[2]);
-      if (!(e[1] === 'hit' || e[1] === 'zap') || !Number.isInteger(s) || s < 0 || s > 3) continue;
+      if (!(e[1] === 'hit' || e[1] === 'zap') || !Number.isInteger(s) || s < 0 || s >= MAX_KARTS) continue;
       seenEvents.add(e[0]);
       applyEvent({ id: e[0], t: e[1], s });
     }
@@ -1513,7 +1549,7 @@ function drawScreens() {
   if (state === 'menu') {
     ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(0, 0, OW, OH);
     txt('KART RACER', OW / 2, 120, 100, 'center', '#ffd23f');
-    txt('3 Runden, bis zu 4 Spieler – freie Plätze fahren Bots', OW / 2, 172, 26, 'center');
+    txt('3 Runden, bis zu 8 Spieler – freie Plätze fahren Bots', OW / 2, 172, 26, 'center');
     const lines = touchMode
       ? ['Gas gibt das Kart von selbst: ◀ ganz links und ▶ ganz rechts lenken',
          'DRIFT (neben den Pfeilen) halten + lenken, loslassen = Turbo',
@@ -1524,8 +1560,10 @@ function drawScreens() {
     lines.forEach((l, i) => txt(l, OW / 2, 222 + i * 34, 22, 'center', '#e8f2ff'));
     const h = hostPeer(), host = amHost();
     // Streckenwahl
-    txt(`${host ? '◀  ' : ''}Strecke ${trackIdx + 1}/${TRACKS.length}: ${TRACKS[trackIdx].name}${host ? '  ▶' : ''}`, OW / 2, 352, 34, 'center', '#ffffff');
-    txt(host ? (touchMode ? '(◀ ▶ antippen wechselt die Strecke)' : '(← → wechselt die Strecke)') : '(der Host wählt die Strecke)', OW / 2, 380, 18, 'center', '#c8d4e4');
+    txt(`${host ? '◀  ' : ''}Strecke ${trackIdx + 1}/${TRACKS.length}: ${TRACKS[trackIdx].name}${host ? '  ▶' : ''}`, OW / 2, 340, 34, 'center', '#ffffff');
+    txt(host ? (touchMode ? '(Zeile links/rechts antippen zum Wechseln)' : '(← → Strecke     ↑ ↓ Stärke der Bots)') : '(der Host wählt Strecke und Bots)', OW / 2, 364, 18, 'center', '#c8d4e4');
+    const BL = BOT_LEVELS[botLevel];
+    txt(`${host ? '◀  ' : ''}Bots: ${BL.name}${host ? '  ▶' : ''}`, OW / 2, 404, 30, 'center', BL.col);
     if (builtTrack === trackIdx && !touchMode) { // am Handy steht hier das Raum-Panel
       const px = OW - MM - 46, py = 196;
       ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(px - 8, py - 8, MM + 16, MM + 44);
@@ -1533,22 +1571,22 @@ function drawScreens() {
       txt(`${(N / 100).toFixed(1).replace('.', ',')} km`, px + MM / 2, py + MM + 28, 20, 'center', '#ffe9a0');
     }
     const cursor = Math.floor(time * 2) % 2 ? '_' : ' ';
-    txt('Dein Name: ' + myName + cursor, OW / 2, 432, 30, 'center', '#ffe9a0');
-    txt(touchMode ? '(antippen zum Ändern)' : '(einfach tippen, Rücktaste löscht)', OW / 2, 457, 18, 'center', '#c8d4e4');
+    txt('Dein Name: ' + myName + cursor, OW / 2, 448, 28, 'center', '#ffe9a0');
+    txt(touchMode ? '(antippen zum Ändern)' : '(einfach tippen, Rücktaste löscht)', OW / 2, 470, 16, 'center', '#c8d4e4');
 
     const vs = viewers().slice().sort((a, b) => a.peer < b.peer ? -1 : 1);
     if (room && vs.length > 1) {
       const rows = Math.min(vs.length, touchMode ? 3 : 4); // am Handy Platz für den Start-Knopf lassen
-      ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(OW / 2 - 300, 474, 600, 42 + rows * 28);
-      txt(`Im Raum: ${vs.length}`, OW / 2 - 280, 500, 22, 'left', '#ffd23f');
+      ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(OW / 2 - 300, 486, 600, 40 + rows * 26);
+      txt(`Im Raum: ${vs.length}`, OW / 2 - 280, 512, 22, 'left', '#ffd23f');
       vs.slice(0, rows).forEach((p, i) => {
         const me = p.isMe && p.sameTab, nm = me ? displayName() : peerName(p);
         const tag = [p === h ? 'Host' : '', me ? 'du' : '', p.presence.mode === 'race' ? 'fährt gerade' : ''].filter(Boolean).join(', ');
-        txt(nm + (tag ? `  (${tag})` : ''), OW / 2 - 280, 530 + i * 28, 22, 'left', me ? '#ffe9a0' : '#fff');
+        txt(nm + (tag ? `  (${tag})` : ''), OW / 2 - 280, 540 + i * 26, 21, 'left', me ? '#ffe9a0' : '#fff');
       });
-      if (vs.length > rows) txt(`+ ${vs.length - rows} weitere`, OW / 2 + 280, 500, 20, 'right', '#c8d4e4');
+      if (vs.length > rows) txt(`+ ${vs.length - rows} weitere`, OW / 2 + 280, 512, 20, 'right', '#c8d4e4');
     } else {
-      txt(room ? (room.switchRoom ? '„Link teilen“ schicken – wer ihn öffnet, landet hier bei dir' : 'Teile den Link – wer die Seite öffnet, landet hier in der Lobby') : 'Einzelspieler-Modus', OW / 2, 510, 22, 'center', '#c8d4e4');
+      txt(room ? (room.switchRoom ? '„Link teilen“ schicken – wer ihn öffnet, landet hier bei dir' : 'Teile den Link – wer die Seite öffnet, landet hier in der Lobby') : 'Einzelspieler-Modus', OW / 2, 518, 22, 'center', '#c8d4e4');
     }
     const startMsg = host ? (touchMode ? 'Hier tippen zum Starten' : 'ENTER drücken zum Starten') : `Warte, bis ${peerName(h)} das Rennen startet …`;
     if (!host || (!touchMode && Math.floor(time * 2) % 2 === 0)) txt(startMsg, OW / 2, 704, 36, 'center', '#ffffff'); // am Handy gibt es dafür einen Knopf
@@ -1565,14 +1603,14 @@ function drawScreens() {
   // Geschwindigkeit + Drift-Anzeige
   // auf dem Handy liegen unten die Touch-Knöpfe, deshalb wandern Tempo und Platz nach oben
   const speedY = touchMode ? 152 : OH - 30, barY = touchMode ? 170 : OH - 92;
-  txt(`${Math.round(Math.abs(player.speed) * 0.8)} km/h`, 30, speedY, touchMode ? 30 : 38);
+  if (state !== 'finish') txt(`${Math.round(Math.abs(player.speed) * 0.8)} km/h`, 30, speedY, touchMode ? 30 : 38);
   if (player.drifting) {
     const c = player.driftCharge, col = c > 1.4 ? '#ff9a1f' : c > 0.7 ? '#3fb8ff' : '#bbb';
     ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(30, barY, 220, 18);
     ctx.fillStyle = col; ctx.fillRect(33, barY + 3, 214 * Math.min(1, c / 1.4), 12);
   }
   // Platzierung
-  const posCol = ['#ffd700', '#d8d8e0', '#e09050', '#ffffff'][pos - 1];
+  const posCol = ['#ffd700', '#d8d8e0', '#e09050'][pos - 1] || '#ffffff';
   txt(pos + '.', OW - 40, touchMode ? 330 : OH - 30, touchMode ? 100 : 130, 'right', posCol);
   // Minikarte
   const mx = OW - MM - 24, my = 24;
@@ -1600,15 +1638,15 @@ function drawScreens() {
   if (msgT > 0 && state !== 'finish') txt(msg, OW / 2, OH / 2 - 40, msg === 'LOS!' ? 150 : 80, 'center', msg === 'LOS!' ? '#3f3' : '#ffd23f');
   if (escMenu) drawPauseMenu();
   if (state === 'finish') {
-    txt('ZIEL!', OW / 2, 150, 120, 'center', '#ffd23f');
+    txt('ZIEL!', OW / 2, 120, 100, 'center', '#ffd23f');
     if (finishDelay <= 0) {
-      ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(OW / 2 - 280, 200, 560, 330);
+      ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(OW / 2 - 280, 150, 560, 22 + rank.length * 46);
       rank.forEach((k, i) => {
-        const y = 260 + i * 66, col = k.isPlayer ? '#ffd23f' : '#fff';
-        txt(`${i + 1}.`, OW / 2 - 240, y, 42, 'left', col);
-        ctx.fillStyle = k.col; ctx.fillRect(OW / 2 - 165, y - 30, 28, 28);
-        txt(k.name, OW / 2 - 120, y, 40, 'left', col);
-        txt(k.finished ? fmtTime(k.finishTime) : 'fährt noch…', OW / 2 + 250, y, 34, 'right', col);
+        const y = 190 + i * 46, col = k.isPlayer ? '#ffd23f' : '#fff';
+        txt(`${i + 1}.`, OW / 2 - 250, y, 32, 'left', col);
+        ctx.fillStyle = k.col; ctx.fillRect(OW / 2 - 190, y - 24, 24, 24);
+        txt(k.name, OW / 2 - 150, y, 30, 'left', col);
+        txt(k.finished ? fmtTime(k.finishTime) : 'fährt noch…', OW / 2 + 260, y, 26, 'right', col);
       });
       const host = amHost(), next = TRACKS[trackIdx].name;
       txt(host ? `◀  Nächste Strecke: ${next}  ▶` : `Nächste Strecke: ${next}`, OW / 2, 580, 30, 'center', '#ffe9a0');
@@ -1745,8 +1783,9 @@ function tapAt(x, y) {
   if (state === 'finish' && finishDelay <= 0 && x < 330 && y > OH - 70) { goToMenu(); return; }
   const side = x < OW / 2 ? -1 : 1;
   if (state === 'menu') {
-    if (y > 320 && y < 392 && amHost()) chooseTrack(trackIdx + side);
-    else if (y > 400 && y < 468) { nameInput.value = myName; nameInput.focus(); }
+    if (y > 310 && y < 376 && amHost()) chooseTrack(trackIdx + side);
+    else if (y >= 376 && y < 424 && amHost()) chooseBotLevel(botLevel + side);
+    else if (y >= 424 && y < 482) { nameInput.value = myName; nameInput.focus(); }
     else if (y > 640 && amHost()) hostStart();
   } else if (state === 'finish' && finishDelay <= 0 && amHost()) {
     if (y > 545 && y < 600) chooseTrack(trackIdx + side);
