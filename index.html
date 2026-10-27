@@ -46,6 +46,28 @@
     background: #ffd23f; color: #111; font: 800 italic 14px "Segoe UI", system-ui, sans-serif; box-shadow: 0 4px 14px rgba(0,0,0,.4); z-index: 5; }
   #ios-hint[hidden] { display: none; }
   #ios-hint button { flex: none; width: 30px; height: 30px; border-radius: 50%; border: 0; background: rgba(0,0,0,.15); color: #111; font: 700 18px system-ui, sans-serif; }
+  /* Raum-Panel im Startmenü: eigenen Raum erstellen und den Link teilen */
+  #room-ui { position: fixed; right: calc(12px + env(safe-area-inset-right, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    display: flex; flex-direction: column; align-items: flex-end; gap: 6px; z-index: 4;
+    font: 800 italic 14px "Segoe UI", system-ui, sans-serif; color: var(--fg); }
+  #room-ui[hidden], #room-lobby[hidden], #toast[hidden] { display: none; }
+  #room-name { background: rgba(0,0,0,.55); padding: 4px 12px; border-radius: 12px; }
+  #room-ui .row { display: flex; gap: 6px; }
+  #room-ui button { border: 2px solid #fff; border-radius: 20px; padding: 8px 14px; font: inherit; cursor: pointer;
+    background: rgba(20, 24, 34, .75); color: var(--fg); }
+  #room-ui button.main { background: #ffd23f; color: #111; }
+  #room-ui button:focus-visible { outline: 3px solid #ffd23f; outline-offset: 2px; }
+  #room-lobby { font-size: 12px !important; padding: 4px 10px !important; }
+  /* am Handy rechts mittig und untereinander, damit der Start-Knopf unten frei bleibt */
+  @media (pointer: coarse) {
+    #room-ui { bottom: auto; top: 50%; transform: translateY(-50%); }
+    #room-ui .row { flex-direction: column; align-items: flex-end; }
+  }
+  #toast { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%); z-index: 6; max-width: calc(100vw - 40px);
+    background: rgba(16, 22, 34, .95); color: var(--fg); border: 2px solid #ffd23f; border-radius: 14px; padding: 12px 18px;
+    font: 800 italic 16px "Segoe UI", system-ui, sans-serif; text-align: center; }
+  #toast input { display: block; width: min(420px, calc(100vw - 80px)); margin-top: 8px; font: 14px system-ui, sans-serif; padding: 6px;
+    -webkit-user-select: text; user-select: text; }
   #name-input { position: fixed; left: 0; top: 0; width: 1px; height: 1px; opacity: 0; border: 0; padding: 0; font-size: 16px; }
 </style>
 <div id="wrap"><canvas id="c" width="1280" height="720" tabindex="0"></canvas></div>
@@ -62,6 +84,15 @@
 </div>
 <input id="name-input" maxlength="12" autocomplete="off" aria-label="Dein Name">
 <div id="ios-hint" hidden><span>Vollbild: unten auf <b>Teilen</b> ⬆️ tippen, dann <b>„Zum Home-Bildschirm“</b> – und das Spiel über das neue Symbol starten.</span><button id="ios-hint-close" aria-label="Hinweis schließen">×</button></div>
+<div id="room-ui" hidden>
+  <div id="room-name"></div>
+  <div class="row">
+    <button id="room-new" type="button">＋ Eigener Raum</button>
+    <button id="room-share" class="main" type="button">🔗 Link teilen</button>
+  </div>
+  <button id="room-lobby" type="button">↩ Zur offenen Lobby</button>
+</div>
+<div id="toast" hidden></div>
 <div id="turn">Bitte das Handy quer halten<br>📱 ↻</div>
 <script>
 'use strict';
@@ -624,14 +655,18 @@ let room = null, roomLabel = '', myPeer = 'local', raceId = null, raceGrid = [],
 let myName = 'Spieler ' + (1 + Math.floor(Math.random() * 99));
 try { const s = localStorage.getItem('kart.name'); if (s) myName = s.slice(0, 12); } catch (e) {}
 
+const cleanRoom = r => String(r || '').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 32) || 'lobby';
+
 // Eigener Server (server.py): bildet dieselben Funktionen nach wie die Claude-"room"-Funktion
 function connectServer() {
   if (!/^https?:$/.test(location.protocol)) return null;
-  const raum = (new URLSearchParams(location.search).get('raum') || 'lobby').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 32) || 'lobby';
-  roomLabel = raum;
-  const url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?raum=' + raum;
-  let ws = null, me = null, myPres = {}, snapshot = [], dirty = true;
+  let ws = null, me = null, myPres = {}, snapshot = [], dirty = true, url = '';
   const others = new Map();
+  function setRoom(name) {
+    roomLabel = cleanRoom(name);
+    url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?raum=' + roomLabel;
+  }
+  setRoom(new URLSearchParams(location.search).get('raum'));
   function open() {
     ws = new WebSocket(url);
     ws.onmessage = ev => {
@@ -648,6 +683,13 @@ function connectServer() {
   }
   open();
   return {
+    // in einen anderen Raum wechseln, ohne die Seite neu zu laden
+    switchRoom(name) {
+      setRoom(name);
+      ws.onclose = null; ws.close();
+      me = null; others.clear(); dirty = true;
+      open();
+    },
     peers() {
       if (dirty) {
         snapshot = [];
@@ -1459,7 +1501,7 @@ function drawScreens() {
     // Streckenwahl
     txt(`${host ? '◀  ' : ''}Strecke ${trackIdx + 1}/${TRACKS.length}: ${TRACKS[trackIdx].name}${host ? '  ▶' : ''}`, OW / 2, 352, 34, 'center', '#ffffff');
     txt(host ? (touchMode ? '(◀ ▶ antippen wechselt die Strecke)' : '(← → wechselt die Strecke)') : '(der Host wählt die Strecke)', OW / 2, 380, 18, 'center', '#c8d4e4');
-    if (builtTrack === trackIdx) {
+    if (builtTrack === trackIdx && !touchMode) { // am Handy steht hier das Raum-Panel
       const px = OW - MM - 46, py = 196;
       ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(px - 8, py - 8, MM + 16, MM + 44);
       ctx.drawImage(mini, px, py);
@@ -1481,11 +1523,7 @@ function drawScreens() {
       });
       if (vs.length > rows) txt(`+ ${vs.length - rows} weitere`, OW / 2 + 280, 500, 20, 'right', '#c8d4e4');
     } else {
-      txt(room ? 'Teile den Link – wer die Seite öffnet, landet hier in der Lobby' : 'Einzelspieler-Modus', OW / 2, 510, 22, 'center', '#c8d4e4');
-    }
-    if (roomLabel) {
-      if (touchMode) txt(`Raum: ${roomLabel}`, OW - 24, 40, 20, 'right', '#c8d4e4');
-      else txt(`Raum: ${roomLabel}   (eigene Gruppe: ?raum=name an den Link hängen)`, OW / 2, 662, 18, 'center', '#c8d4e4');
+      txt(room ? (room.switchRoom ? '„Link teilen“ schicken – wer ihn öffnet, landet hier bei dir' : 'Teile den Link – wer die Seite öffnet, landet hier in der Lobby') : 'Einzelspieler-Modus', OW / 2, 510, 22, 'center', '#c8d4e4');
     }
     const startMsg = host ? (touchMode ? 'Hier tippen zum Starten' : 'ENTER drücken zum Starten') : `Warte, bis ${peerName(h)} das Rennen startet …`;
     if (!host || (!touchMode && Math.floor(time * 2) % 2 === 0)) txt(startMsg, OW / 2, 704, 36, 'center', '#ffffff'); // am Handy gibt es dafür einen Knopf
@@ -1573,6 +1611,7 @@ const touchEl = document.getElementById('touch'), nameInput = document.getElemen
 function syncTouchUi() {
   if (touchEl.hidden === touchMode) touchEl.hidden = !touchMode;
   syncIosHint();
+  syncRoomUi();
   const r = state === 'race' || state === 'countdown' ? '1' : '0';
   if (touchEl.dataset.race !== r) touchEl.dataset.race = r;
   const f = fsSupported() && !fsActive() ? '1' : '0';
@@ -1679,5 +1718,66 @@ nameInput.addEventListener('input', () => {
   saveName();
 });
 nameInput.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') nameInput.blur(); });
+
+// ===================== Eigene Räume =====================
+// "Eigener Raum" denkt sich einen Raumnamen aus, wechselt sofort hinein und teilt den Link
+// (am Handy über das Teilen-Menü, am PC über die Zwischenablage).
+const roomUi = document.getElementById('room-ui'), roomNameEl = document.getElementById('room-name');
+const roomLobbyBtn = document.getElementById('room-lobby'), toastEl = document.getElementById('toast');
+const ROOM_WORDS = ['turbo', 'blitz', 'drift', 'pilz', 'panzer', 'rakete', 'boost', 'kurve', 'piste', 'auspuff'];
+let toastTimer = 0;
+
+function newRoomName() {
+  const abc = 'abcdefghjkmnpqrstuvwxyz23456789'; // ohne leicht verwechselbare Zeichen wie 0/o, 1/l/i
+  let code = '';
+  for (let i = 0; i < 4; i++) code += abc[Math.floor(Math.random() * abc.length)];
+  return ROOM_WORDS[Math.floor(Math.random() * ROOM_WORDS.length)] + '-' + code;
+}
+const roomLink = () => location.origin + location.pathname + '?raum=' + roomLabel;
+
+function showToast(text, link) {
+  toastEl.textContent = text;
+  if (link) {
+    const inp = document.createElement('input');
+    inp.readOnly = true; inp.value = link; inp.setAttribute('aria-label', 'Link zum Raum');
+    toastEl.appendChild(inp);
+    setTimeout(() => { inp.focus(); inp.select(); }, 0);
+  }
+  toastEl.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toastEl.hidden = true; }, link ? 9000 : 2600);
+}
+
+function joinRoom(name) {
+  room.switchRoom(name);
+  history.replaceState(null, '', location.pathname + (roomLabel === 'lobby' ? '' : '?raum=' + roomLabel));
+  lastRaceId = null; sendT = 0;
+}
+
+// muss direkt im Klick passieren, sonst verweigern Browser Teilen und Kopieren
+function shareLink(created) {
+  const link = roomLink(), hello = created ? `Raum „${roomLabel}“ erstellt – ` : '';
+  if (touchMode && navigator.share) {
+    navigator.share({ title: 'Kart Racer', text: 'Fahr mit mir Kart Racer! 🏎️', url: link })
+      .catch(e => { if (!e || e.name !== 'AbortError') showToast(hello + 'kopiere diesen Link:', link); });
+    return;
+  }
+  const copy = navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(link) : Promise.reject();
+  copy.then(() => showToast(hello + 'Link kopiert! Schick ihn deinen Freunden.'))
+      .catch(() => showToast(hello + 'kopiere diesen Link:', link));
+}
+
+document.getElementById('room-new').addEventListener('click', () => { wake(); joinRoom(newRoomName()); shareLink(true); });
+document.getElementById('room-share').addEventListener('click', () => { wake(); shareLink(false); });
+roomLobbyBtn.addEventListener('click', () => { joinRoom('lobby'); showToast('Du bist wieder in der offenen Lobby.'); });
+
+function syncRoomUi() {
+  const show = !!(room && room.switchRoom) && state === 'menu' && !optionsOpen;
+  if (roomUi.hidden === show) roomUi.hidden = !show;
+  const label = 'Raum: ' + roomLabel;
+  if (roomNameEl.textContent !== label) roomNameEl.textContent = label;
+  const inLobby = roomLabel === 'lobby';
+  if (roomLobbyBtn.hidden !== inLobby) roomLobbyBtn.hidden = inLobby;
+}
 out.focus();
 </script>
