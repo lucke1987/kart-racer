@@ -164,6 +164,28 @@ const TRACKS = [
     ctrl: [[715,279],[1059,525],[1458,405],[1700,659],[1394,917],[1619,1196],[1626,1441],[1310,1604],[1042,1454],[776,1666],[484,1696],[241,1307],[601,988],[499,741],[423,412]] },
   { name: 'Polarnacht', theme: 'polar', size: 2048, road: 84,
     ctrl: [[444,755],[626,369],[848,178],[1068,710],[1453,368],[1772,606],[1810,948],[1624,1264],[1297,1307],[1330,1709],[1038,1692],[799,1507],[552,1375],[638,1132],[551,1000]] },
+
+  // ---- Profi-Strecken: schmaler, enger, mit Sprungschanzen über Abgründe ----
+  { name: 'Sumpfsprint', theme: 'swamp', size: 1792, road: 72, hard: true, jumps: 2,
+    ctrl: [[1001,1493],[851,1127],[482,1413],[296,1133],[156,875],[319,725],[727,658],[748,216],[1060,336],[1057,680],[1183,717],[1491,869],[1310,1097],[1375,1364]] },
+  { name: 'Dschungelpfad', theme: 'jungle', size: 2048, road: 68, hard: true, jumps: 2,
+    ctrl: [[391,634],[534,513],[696,307],[982,665],[1197,207],[1441,475],[1391,806],[1583,913],[1590,1103],[1224,1195],[1337,1666],[1165,1884],[933,1666],[715,1739],[562,1497],[794,1107],[542,956]] },
+  { name: 'Wüstenschanze', theme: 'desert', size: 1792, road: 72, hard: true, jumps: 3,
+    ctrl: [[393,583],[740,726],[698,166],[984,249],[1251,271],[1262,678],[1452,898],[1458,1201],[1049,1068],[965,1189],[793,1609],[523,1353],[663,999],[313,872]] },
+  { name: 'Gletscherspalte', theme: 'snow', size: 1792, road: 72, hard: true, jumps: 2,
+    ctrl: [[1016,236],[1003,679],[1412,541],[1538,802],[1392,1123],[1333,1338],[1004,1182],[923,1570],[580,1502],[529,1205],[210,1001],[433,745],[706,676],[646,215]] },
+  { name: 'Hafenbecken', theme: 'beach', size: 2048, road: 70, hard: true, jumps: 3,
+    ctrl: [[600,565],[927,577],[1111,376],[1405,536],[1477,653],[1647,871],[1773,1122],[1368,1201],[1532,1709],[1299,1804],[959,1324],[708,1656],[365,1605],[523,1141],[352,930],[579,755]] },
+  { name: 'Mondkrater', theme: 'moon', size: 2048, road: 68, hard: true, jumps: 2,
+    ctrl: [[562,987],[329,832],[401,547],[878,812],[940,527],[1209,529],[1203,785],[1392,878],[1845,940],[1696,1168],[1426,1212],[1511,1626],[1170,1718],[965,1510],[694,1618],[349,1494],[709,1133]] },
+  { name: 'Canyon-Sprünge', theme: 'canyon', size: 2048, road: 70, hard: true, jumps: 3,
+    ctrl: [[283,1021],[289,684],[671,634],[932,769],[1084,438],[1222,542],[1234,835],[1641,708],[1868,1042],[1613,1308],[1409,1340],[1426,1739],[980,1555],[863,1402],[507,1652],[458,1219]] },
+  { name: 'Lavaburg', theme: 'castle', size: 2048, road: 68, hard: true, jumps: 3,
+    ctrl: [[857,792],[900,315],[1080,277],[1163,738],[1469,596],[1657,764],[1632,1004],[1758,1300],[1328,1324],[1299,1516],[1066,1573],[887,1420],[663,1487],[316,1471],[398,1156],[238,748],[733,830]] },
+  { name: 'Vulkanschlund', theme: 'volcano', size: 2048, road: 70, hard: true, jumps: 3, gap: 6,
+    ctrl: [[1506,1454],[1204,1426],[1075,1824],[851,1764],[664,1438],[352,1289],[446,1041],[545,786],[840,816],[724,280],[976,198],[1142,700],[1424,526],[1734,638],[1545,926],[1668,1252]] },
+  { name: 'Regenbogen-Ring', theme: 'rainbow', size: 2048, road: 70, hard: true, jumps: 2,
+    ctrl: [[1619,747],[1646,924],[1681,1279],[1261,1232],[1341,1701],[1080,1791],[853,1534],[779,1302],[531,1366],[246,1135],[631,882],[755,812],[731,342],[1000,220],[1194,323],[1181,809]] },
 ];
 
 const THEMES = {
@@ -172,21 +194,32 @@ const THEMES = {
   spring:  { grass: ['#5cbf4f', '#51b046'], border: '#e3d08e', road: '#6a6a74', curb: ['#ffffff', '#f06292'], line: 'rgba(255,255,255,.55)',
              outside: '#3f9a44', sky: ['#4aa0f0', '#d8f1ff'], mtn: ['#a4c4e6', '#7fa8d4', '#4c9a50'], trees: ['tree', 'tree', 'pine'], clouds: true },
   desert:  { grass: ['#e2c27a', '#d9b86d'], border: '#c99a5b', road: '#7a6c60', curb: ['#ffffff', '#d9822b'], line: 'rgba(255,255,255,.5)',
-             outside: '#cfa767', sky: ['#e98f4a', '#fde3b0'], mtn: ['#d9a77a', '#c47f4f', '#a8683f'], trees: ['cactus', 'cactus', 'rock'], clouds: false },
+             outside: '#cfa767', sky: ['#e98f4a', '#fde3b0'], mtn: ['#d9a77a', '#c47f4f', '#a8683f'], trees: ['cactus', 'cactus', 'rock'], clouds: false, gap: 'chasm' },
   canyon:  { grass: ['#c4683e', '#b95f37'], border: '#e0a070', road: '#6b5c55', curb: ['#ffffff', '#c03030'], line: 'rgba(255,255,255,.5)',
              outside: '#a04c2c', sky: ['#4fa3e0', '#ffe0c0'], mtn: ['#c97a4f', '#a8553a', '#80402a'], trees: ['rock', 'cactus', 'rock'], clouds: true },
   beach:   { grass: ['#f1dfa8', '#ebd79c'], border: '#e2c07c', road: '#6e6e78', curb: ['#ffffff', '#1e88e5'], line: 'rgba(255,255,255,.55)',
-             outside: '#2a8fd0', sky: ['#2f9be8', '#c9f0ff'], mtn: ['#9fd3ef', '#6fb8e0', '#2f7fc0'], trees: ['palm'], clouds: true },
+             outside: '#2a8fd0', sky: ['#2f9be8', '#c9f0ff'], mtn: ['#9fd3ef', '#6fb8e0', '#2f7fc0'], trees: ['palm'], clouds: true, gap: 'water' },
   snow:    { grass: ['#f2f6fb', '#e4ecf5'], border: '#b9c9dc', road: '#5d6470', curb: ['#ffffff', '#2f6fd6'], line: 'rgba(255,255,255,.6)',
              outside: '#dfe8f2', sky: ['#6c9fd8', '#e6f1ff'], mtn: ['#ffffff', '#c8d8ec', '#9db4cf'], trees: ['snowpine'], clouds: true },
   autumn:  { grass: ['#8a9a3c', '#7f8e35'], border: '#a8743a', road: '#5f5a58', curb: ['#ffffff', '#c0392b'], line: 'rgba(255,255,255,.5)',
              outside: '#6b7a2c', sky: ['#7aa8d8', '#f3d9b0'], mtn: ['#b48a6a', '#9a6a4a', '#6f6a2a'], trees: ['autumn', 'autumn', 'pine'], clouds: true },
   volcano: { grass: ['#3b3236', '#342c30'], border: '#7a3418', road: '#55505a', curb: ['#ffcc33', '#222222'], line: 'rgba(255,200,80,.55)',
-             outside: '#d8461b', sky: ['#3a1f2b', '#e0603a'], mtn: ['#5a2c2c', '#3d2222', '#2a1818'], trees: ['lavarock', 'rock'], clouds: false },
+             outside: '#d8461b', sky: ['#3a1f2b', '#e0603a'], mtn: ['#5a2c2c', '#3d2222', '#2a1818'], trees: ['lavarock', 'rock'], clouds: false, gap: 'lava' },
   night:   { grass: ['#1f4a2a', '#1b4226'], border: '#5a5340', road: '#3c3c48', curb: ['#dddddd', '#c02828'], line: 'rgba(255,255,160,.7)',
              outside: '#163a20', sky: ['#070b1f', '#2a3a6a'], mtn: ['#1a2340', '#141b33', '#0f2a18'], trees: ['tree', 'pine'], stars: true },
   polar:   { grass: ['#c9d6ea', '#bccbe2'], border: '#8ea2c2', road: '#4a5060', curb: ['#ffffff', '#3fa0ff'], line: 'rgba(255,255,255,.6)',
              outside: '#a9bad4', sky: ['#0b1530', '#3b5a8a'], mtn: ['#d6e2f2', '#9fb2cf', '#6e83a8'], trees: ['snowpine', 'rock'], stars: true },
+  swamp:   { grass: ['#556b2f', '#4d6229'], border: '#6b5a3a', road: '#5a5650', curb: ['#ffffff', '#8bc34a'], line: 'rgba(255,255,255,.45)',
+             outside: '#3b4a26', sky: ['#7f9c8a', '#d6e4c8'], mtn: ['#6f8a74', '#56705c', '#3d5240'], trees: ['tree', 'bush', 'bush'], clouds: true, gap: 'water' },
+  jungle:  { grass: ['#2f7d32', '#2a722d'], border: '#7a5a2e', road: '#5d5850', curb: ['#ffffff', '#2e7d32'], line: 'rgba(255,255,255,.5)',
+             outside: '#1e5a22', sky: ['#5fb0d8', '#d8f3d0'], mtn: ['#3f7a4a', '#2e6338', '#1f4f2a'], trees: ['palm', 'tree', 'bush'], clouds: true, gap: 'water' },
+  moon:    { grass: ['#8a8a92', '#7f7f88'], border: '#5c5c66', road: '#3c3c46', curb: ['#ffffff', '#7e57c2'], line: 'rgba(200,220,255,.6)',
+             outside: '#6f6f78', sky: ['#000005', '#1b1f3a'], mtn: ['#9a9aa6', '#77778a', '#55556a'], trees: ['rock', 'crystal'], stars: true, gap: 'chasm' },
+  castle:  { grass: ['#4a4448', '#433e42'], border: '#2a2528', road: '#6a6470', curb: ['#e0c060', '#5a1a1a'], line: 'rgba(255,220,120,.5)',
+             outside: '#2a2026', sky: ['#2a1030', '#a0405a'], mtn: ['#3a2a3a', '#2a1f2c', '#1a1420'], trees: ['lavarock', 'rock'], stars: true, gap: 'lava' },
+  // Regenbogen-Ring: keine Randstreifen – wer von der Fahrbahn abkommt, fällt ins All
+  rainbow: { grass: ['#05030f', '#080616'], border: '#05030f', road: 'rainbow', curb: ['#ffffff', '#ff4fd8'], line: 'rgba(255,255,255,.7)',
+             outside: '#020108', sky: ['#000000', '#1a0b3a'], mtn: ['#2a1a5a', '#1c1240', '#120b2a'], trees: ['crystal'], stars: true, gap: 'void', voidOff: true },
 };
 
 const hexRgb = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
@@ -195,7 +228,7 @@ const rgba = (h, a) => { const [r, g, b] = hexRgb(h); return `rgba(${r},${g},${b
 const MM = 190;                           // Größe der Minikarte
 const SW = Math.round(2 * Math.PI * FOCAL); // Breite des Rundum-Panoramas
 // Zustand der gerade geladenen Strecke
-let trackIdx = 0, builtTrack = -1, track, theme, MAP, ROAD, path, N, pads, trees;
+let trackIdx = 0, builtTrack = -1, track, theme, MAP, ROAD, path, N, pads, trees, jumps = [];
 let texBuf, mips, ground, OUTSIDE, mini, mmS, mtn, skyGrad, fogGrad;
 
 // Catmull-Rom-Spline durch die Kontrollpunkte, gleichmäßig alle 10 Einheiten abgetastet
@@ -274,6 +307,15 @@ function decoSprite(kind) {
     g.fillStyle = '#3f8f3a'; g.fillRect(3, 18, 7, 4); g.fillRect(3, 10, 4, 10); circle(g, 5, 10, 2, '#3f8f3a');
     g.fillStyle = '#3f8f3a'; g.fillRect(14, 22, 7, 4); g.fillRect(17, 14, 4, 10); circle(g, 19, 14, 2, '#3f8f3a');
     g.fillStyle = '#5fb150'; g.fillRect(10, 5, 1, 33); g.fillRect(4, 10, 1, 9); g.fillRect(18, 14, 1, 9);
+  } else if (kind === 'bush') {
+    ww = 26; const g = (c = mkCanvas(30 * SS, 18 * SS)).getContext('2d'); g.scale(SS, SS);
+    circle(g, 9, 11, 7, '#2e6b2a'); circle(g, 20, 11, 8, '#2e6b2a'); circle(g, 14, 8, 7, '#3f8a38'); circle(g, 12, 6, 2.5, '#6cbf5a');
+    g.fillStyle = '#2e6b2a'; g.fillRect(3, 11, 24, 7);
+  } else if (kind === 'crystal') {
+    ww = 16; const g = (c = mkCanvas(20 * SS, 34 * SS)).getContext('2d'); g.scale(SS, SS);
+    poly(g, [[10, 0], [17, 12], [14, 34], [6, 34], [3, 12]], '#7ad7ff');
+    poly(g, [[10, 0], [17, 12], [10, 34]], '#c79bff');
+    poly(g, [[10, 2], [12, 12], [9, 26], [7, 12]], 'rgba(255,255,255,.55)');
   } else { // rock / lavarock
     ww = 26; const g = (c = mkCanvas(30 * SS, 20 * SS)).getContext('2d'); g.scale(SS, SS);
     const lava = kind === 'lavarock';
@@ -303,6 +345,48 @@ function drawPad(g, pad, fill, arrows) {
   }
   g.restore();
 }
+// Fläche quer zur Strecke zwischen zwei Wegpunkten (für Schanzen und Abgründe)
+function stripPoly(g, i0, i1, half) {
+  g.beginPath();
+  for (let i = i0; i <= i1; i++) { const p = path[(i + N) % N]; g.lineTo(p.x + p.nx * half, p.y + p.ny * half); }
+  for (let i = i1; i >= i0; i--) { const p = path[(i + N) % N]; g.lineTo(p.x - p.nx * half, p.y - p.ny * half); }
+  g.closePath();
+}
+const GAP_LOOK = { chasm: ['#0b0910', '#3a3440'], water: ['#1565c0', '#8fd0ff'], lava: ['#d84315', '#ffc23a'], void: ['#000000', '#5a2aa0'] };
+function drawJumps(g, forMask) {
+  for (const j of jumps) {
+    // Abgrund, breiter als die Straße, damit man nicht drumherum fahren kann
+    stripPoly(g, j.gap0, j.gap1, ROAD / 2 + 45); // nicht breiter, sonst reicht er bis zu benachbarten Streckenteilen
+    if (forMask) { g.fillStyle = '#f0f'; g.fill(); }
+    else {
+      const [deep, edge] = GAP_LOOK[theme.gap || 'chasm'];
+      g.fillStyle = deep; g.fill();
+      g.strokeStyle = edge; g.lineWidth = 5; g.stroke();
+      g.fillStyle = edge;
+      for (let k = 0; k < 40; k++) { // Wellen, Glut oder Felsbrocken in der Tiefe
+        const p = path[Math.floor(j.gap0 + rnd() * (j.gap1 - j.gap0)) % N], lat = (rnd() * 2 - 1) * (ROAD / 2 + 38);
+        g.globalAlpha = 0.25 + rnd() * 0.4;
+        g.beginPath(); g.ellipse(p.x + p.nx * lat, p.y + p.ny * lat, 3 + rnd() * 6, 1.5 + rnd() * 2, p.ang, 0, 7); g.fill();
+      }
+      g.globalAlpha = 1;
+    }
+    // Schanze direkt davor
+    stripPoly(g, j.ramp, j.at, ROAD / 2 + 6);
+    if (forMask) { g.fillStyle = '#00f'; g.fill(); continue; }
+    g.fillStyle = '#f5c518'; g.fill();
+    g.strokeStyle = '#2a2a2a'; g.lineWidth = 3; g.stroke();
+    g.fillStyle = '#d84315';
+    for (let i = j.ramp; i <= j.at; i++) {
+      const p = path[(i + N) % N];
+      for (let lat = -ROAD / 2 + 10; lat <= ROAD / 2 - 10; lat += 16) {
+        g.save(); g.translate(p.x + p.nx * lat, p.y + p.ny * lat); g.rotate(p.ang);
+        g.beginPath(); g.moveTo(-3, -6); g.lineTo(4, 0); g.lineTo(-3, 6); g.lineTo(0, 0); g.closePath(); g.fill();
+        g.restore();
+      }
+    }
+  }
+}
+
 function surfaceAt(x, y) {
   const u = x | 0, v = y | 0;
   return (u < 0 || v < 0 || u >= MAP || v >= MAP) ? 0 : ground[v * MAP + u];
@@ -314,11 +398,27 @@ function buildTrack(i) {
   MAP = track.size; ROAD = track.road;
   path = splinePath(track.ctrl); N = path.length;
 
+  // Sprungschanzen mit Abgrund dahinter (Profi-Strecken) – nur auf geraden Stücken, weg vom Start und den Item-Boxen
+  const straightness = i => { let c = 0; for (let k = -14; k <= 10; k++) c += Math.abs(wrapA(path[(i + k + 1 + N) % N].ang - path[(i + k + N) % N].ang)); return c; };
+  jumps = [];
+  if (track.jumps) {
+    const gapLen = track.gap || 5, boxIdx = [0.2, 0.45, 0.7, 0.9].map(f => Math.floor(N * f));
+    const cand = [...Array(N).keys()].filter(i => i > 45 && i < N - 40 && boxIdx.every(b => Math.abs(b - i) > 22))
+      .sort((a, b) => straightness(a) - straightness(b));
+    for (const i of cand) {
+      if (jumps.every(j => Math.min(Math.abs(i - j.at), N - Math.abs(i - j.at)) > N / (track.jumps + 1.5)))
+        jumps.push({ at: i, ramp: i - 2, gap0: i + 1, gap1: i + 1 + gapLen });
+      if (jumps.length === track.jumps) break;
+    }
+    jumps.sort((a, b) => a.at - b.at);
+  }
+  const nearJump = (i, d) => jumps.some(j => Math.min(Math.abs(i - j.at), N - Math.abs(i - j.at)) < d);
+
   // Boost-Felder auf den geradesten Abschnitten (mehr auf langen Strecken)
   const curvAt = i => Math.abs(wrapA(path[(i + 8) % N].ang - path[(i - 8 + N) % N].ang));
   const padCount = N > 450 ? 5 : 3;
   pads = [];
-  for (const i of [...Array(N).keys()].filter(i => i > 30 && i < N - 30).sort((a, b) => curvAt(a) - curvAt(b))) {
+  for (const i of [...Array(N).keys()].filter(i => i > 30 && i < N - 30 && !nearJump(i, 25)).sort((a, b) => curvAt(a) - curvAt(b))) {
     if (pads.every(p => Math.min(Math.abs(i - p.i), N - Math.abs(i - p.i)) > N / (padCount + 1)))
       pads.push({ i, off: [-18, 18, 0, 18, -18][pads.length] });
     if (pads.length === padCount) break;
@@ -332,6 +432,7 @@ function buildTrack(i) {
     let md = Infinity;
     for (const p of path) { const d = (p.x - x) ** 2 + (p.y - y) ** 2; if (d < md) md = d; }
     if (md < (ROAD / 2 + 45) ** 2) continue;
+    if (jumps.some(j => { for (let i = j.gap0 - 2; i <= j.gap1 + 2; i++) { const q = path[i % N]; if ((q.x - x) ** 2 + (q.y - y) ** 2 < (ROAD / 2 + 100) ** 2) return true; } return false; })) continue;
     if (trees.some(t => (t.x - x) ** 2 + (t.y - y) ** 2 < 42 ** 2)) continue;
     trees.push({ x, y, s: decoSprite(theme.trees[Math.floor(rnd() * theme.trees.length)]) });
   }
@@ -345,7 +446,9 @@ function buildTrack(i) {
   strokePath(tg, ROAD + 40, theme.border);
   strokePath(tg, ROAD + 12, theme.curb[0]);
   strokePath(tg, ROAD + 12, theme.curb[1], [14, 14]);
-  strokePath(tg, ROAD, theme.road);
+  if (theme.road === 'rainbow') { // Regenbogen-Fahrbahn aus sieben Farbstreifen
+    ['#ff3b3b', '#ff9a1f', '#ffe14d', '#4cd964', '#2fa8ff', '#5b5bff', '#c04dff'].forEach((c, k) => strokePath(tg, ROAD * (1 - k / 7), c));
+  } else strokePath(tg, ROAD, theme.road);
   strokePath(tg, 3, theme.line, [20, 20]);
   { // Start-/Ziellinie
     const p = path[0];
@@ -356,6 +459,7 @@ function buildTrack(i) {
     tg.restore();
   }
   for (const pad of pads) drawPad(tg, pad, '#ffd23f', true);
+  drawJumps(tg, false);
   const td = tg.getImageData(0, 0, MAP, MAP), a = td.data;
   for (let i = 0; i < a.length; i += 4) { const n = (rnd() - 0.5) * 10; a[i] += n; a[i + 1] += n; a[i + 2] += n; }
   tg.putImageData(td, 0, 0);
@@ -370,14 +474,18 @@ function buildTrack(i) {
   const [orr, og, ob] = hexRgb(theme.outside);
   OUTSIDE = (0xff000000 | (ob << 16) | (og << 8) | orr) >>> 0;
 
-  // Untergrund-Maske: 0 = Gelände, 1 = Straße, 2 = Boost
+  // Untergrund-Maske: 0 = Gelände, 1 = Straße, 2 = Boost, 3 = Schanze, 4 = Abgrund (man stürzt ab)
   const mask = mkCanvas(MAP, MAP), mg = mask.getContext('2d');
   mg.fillStyle = '#000'; mg.fillRect(0, 0, MAP, MAP);
   strokePath(mg, ROAD + 12, '#f00');
   for (const pad of pads) drawPad(mg, pad, '#0f0', false);
-  const md = mg.getImageData(0, 0, MAP, MAP).data;
+  drawJumps(mg, true);
+  const md = mg.getImageData(0, 0, MAP, MAP).data, offGround = theme.voidOff ? 4 : 0;
   ground = new Uint8Array(MAP * MAP);
-  for (let i = 0; i < ground.length; i++) ground[i] = md[i * 4 + 1] > 128 ? 2 : md[i * 4] > 128 ? 1 : 0;
+  for (let i = 0; i < ground.length; i++) {
+    const r = md[i * 4], gg = md[i * 4 + 1], b = md[i * 4 + 2];
+    ground[i] = gg > 128 ? 2 : r > 128 && b > 128 ? 4 : b > 128 ? 3 : r > 128 ? 1 : offGround;
+  }
 
   // Himmel und Berge (Panorama, rundum kachelbar)
   mtn = mkCanvas(SW, HORIZON + 1);
@@ -422,6 +530,11 @@ function buildTrack(i) {
   mm.lineWidth = ROAD * mmS; mm.strokeStyle = '#eee'; mm.stroke();
   const p0 = path[0];
   mm.fillStyle = '#111'; mm.beginPath(); mm.arc(p0.x * mmS, p0.y * mmS, 3, 0, 7); mm.fill();
+  for (const j of jumps) { // Abgründe als Querbalken auf der Minikarte
+    const q = path[(j.gap0 + 2) % N], h = (ROAD / 2 + 30) * mmS;
+    mm.strokeStyle = theme.gap === 'lava' ? '#ff5a1f' : theme.gap === 'water' ? '#2f8fff' : '#c04dff'; mm.lineWidth = 4;
+    mm.beginPath(); mm.moveTo((q.x + q.nx * h / mmS) * mmS, (q.y + q.ny * h / mmS) * mmS); mm.lineTo((q.x - q.nx * h / mmS) * mmS, (q.y - q.ny * h / mmS) * mmS); mm.stroke();
+  }
 }
 buildTrack(0);
 
@@ -755,12 +868,13 @@ const soloRace = () => !karts.some(k => k.human && k.remote);
 // Kart-Zustand kompakt als Zahlenliste
 const enc = k => [Math.round(k.x * 10) / 10, Math.round(k.y * 10) / 10, Math.round(k.a * 1000) / 1000, Math.round(k.speed),
   k.boost > 0 ? 1 : 0, k.lap, k.idx, k.finished ? 1 : 0, Math.round(k.finishTime * 100) / 100, k.hop > 0 ? 1 : 0, k.drifting ? k.driftDir : 0,
-  k.small > 0 ? 1 : 0, k.spin > 0 ? 1 : 0];
+  k.small > 0 ? 1 : 0, k.spin > 0 ? 1 : 0, Math.round((k.z || 0) * 10) / 10, k.fall > 0 ? 1 : 0];
 
 function applyRemote(k, s) {
   const v = s.map(Number);
   if (v.length < 13 || !v.every(Number.isFinite)) return;
   k.small = v[11] ? 1 : 0; k.spin = v[12] ? 1 : 0;
+  k.z = v.length > 14 ? clamp(v[13], 0, 20) : 0; k.fall = v.length > 14 && v[14] ? 0.6 : 0;
   k.tx = clamp(v[0], 0, MAP); k.ty = clamp(v[1], 0, MAP); k.ta = v[2]; k.speed = clamp(v[3], -60, 260);
   k.boost = v[4] ? 0.2 : 0; k.lap = v[5] | 0; k.idx = clamp(v[6] | 0, 0, N - 1);
   k.finished = !!v[7]; k.finishTime = v[8]; k.hop = v[9] ? 0.1 : 0; k.drifting = !!v[10]; k.driftDir = Math.sign(v[10]);
@@ -854,6 +968,7 @@ function startRace(id, grid, host, trk, lvl) {
       lap: 0, idx, progress: idx, finished: false, finishTime: 0,
       laneOff: human ? 0 : off * 0.9 + (rnd() * 2 - 1) * 3, phase: rnd() * 6,
       slot: i, item: null, roll: 0, rollItem: null, itemDelay: 0, spin: 0, spinVis: 0, small: 0,
+      z: 0, air: 0, airT: 1, fall: 0, onRamp: false,
     };
   });
   placeBoxes(); shells = []; remoteShells.clear(); peerPres.clear(); outEvents = []; zapFlash = 0; escMenu = false;
@@ -1028,7 +1143,35 @@ function aiInput(k) {
 
 // ===================== Physik =====================
 function updateKart(k, inp, dt) {
+  if (k.fall > 0) { // abgestürzt: kurz warten, dann vor der Schanze wieder einsetzen
+    k.fall -= dt; k.speed = 0; k.z = 0;
+    if (k.fall <= 0) respawnKart(k);
+    return;
+  }
+  if (k.air > 0) { // in der Luft: keine Lenkung, das Tempo bleibt erhalten
+    k.air -= dt;
+    const t = 1 - Math.max(0, k.air) / k.airT;
+    k.z = 48 * t * (1 - t); // Flugbahn, höchstens 12 Einheiten hoch
+    k.x += Math.cos(k.moveA) * k.speed * dt; k.y += Math.sin(k.moveA) * k.speed * dt;
+    if (k.boost > 0) k.boost -= dt;
+    if (k.air <= 0) {
+      k.z = 0;
+      if (surfaceAt(k.x, k.y) === 4) startFall(k);
+      else if (k.isPlayer) beep(140, 0.12, 'square', 0.06);
+    }
+    return;
+  }
   const surf = surfaceAt(k.x, k.y);
+  if (surf === 4) { startFall(k); return; }
+  // Absprung, sobald man die Schanze verlässt – wer zu langsam ist, landet im Abgrund
+  if (surf === 3) k.onRamp = true;
+  else if (k.onRamp) {
+    k.onRamp = false;
+    if (k.speed > 40) {
+      k.airT = k.air = 0.3 + k.speed / 350; k.drifting = false;
+      if (k.isPlayer) beep(520, 0.25, 'triangle', 0.06);
+    }
+  }
   if (surf === 2) { if (k.boost <= 0 && k.isPlayer) beep(660, 0.25, 'sawtooth', 0.05); k.boost = Math.max(k.boost, 1.0); }
   if (k.spin > 0) { // getroffen: dreht sich, keine Kontrolle
     k.spin -= dt; k.spinVis += dt * 14;
@@ -1079,6 +1222,7 @@ function collide() {
   for (let i = 0; i < karts.length; i++) for (let j = i + 1; j < karts.length; j++) {
     const a = karts[i], b = karts[j];
     if (a.gone || b.gone || (a.remote && b.remote)) continue;
+    if ((a.z || 0) > 3 || (b.z || 0) > 3 || a.fall > 0 || b.fall > 0) continue;
     const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
     if (d > 0 && d < 10) {
       const o = 10 - d, nx = dx / d, ny = dy / d;
@@ -1096,7 +1240,7 @@ function collide() {
     }
   }
   for (const k of karts) {
-    if (k.remote) continue;
+    if (k.remote || (k.z || 0) > 3 || k.fall > 0) continue;
     for (const t of trees) {
       const dx = k.x - t.x, dy = k.y - t.y, d = Math.hypot(dx, dy);
       if (d > 0 && d < 10) {
@@ -1155,7 +1299,7 @@ function placeBoxes() {
   boxes = [];
   for (const f of [0.2, 0.45, 0.7, 0.9]) {
     let i = Math.floor(N * f);
-    if (pads.some(p => Math.abs(p.i - i) < 8)) i = (i + 14) % N;
+    if (pads.some(p => Math.abs(p.i - i) < 8) || jumps.some(j => Math.abs(j.at - i) < 16)) i = (i + 20) % N;
     const p = path[i];
     for (const off of [-24, -8, 8, 24]) {
       const o = off * ROAD / 84;
@@ -1236,7 +1380,7 @@ function updateShells(dt) {
       const p = path[s.idx];
       let ox = s.x - p.x, oy = s.y - p.y; const ol = Math.hypot(ox, oy) || 1; ox /= ol; oy /= ol;
       const dot = s.vx * ox + s.vy * oy;
-      if (surfaceAt(nx, ny) === 0 && dot > 0) { s.vx -= 2 * dot * ox; s.vy -= 2 * dot * oy; } // an der Kante abprallen
+      if ((surfaceAt(nx, ny) === 0 || (theme.voidOff && surfaceAt(nx, ny) === 4)) && dot > 0) { s.vx -= 2 * dot * ox; s.vy -= 2 * dot * oy; } // an der Kante abprallen
       else { s.x = nx; s.y = ny; }
     }
     for (const k of karts) {
@@ -1254,6 +1398,20 @@ function aiItems(k, dt) {
   const straight = Math.abs(wrapA(path[(k.idx + 15) % N].ang - path[k.idx].ang)) < 0.25;
   if ((k.item === 'mushroom' && straight) || (k.item === 'green' && straight)
       || (k.item === 'red' && pos > 0) || (k.item === 'lightning' && pos > 0) || k.itemDelay < -6) useItem(k);
+}
+
+function startFall(k) {
+  k.fall = 1.3; k.air = 0; k.z = 0; k.drifting = false; k.boost = 0; k.speed = 0; k.onRamp = false;
+  if (k.isPlayer) { beep(320, 0.5, 'sawtooth', 0.07); beep(110, 0.6, 'square', 0.05); msg = 'ABSTURZ!'; msgT = 1.2; }
+}
+// nach einem Absturz: vor der Schanze (oder knapp hinter der Absturzstelle) mit Tempo 0 wieder einsetzen
+function respawnKart(k) {
+  let idx = (k.idx - 4 + N) % N;
+  for (const j of jumps) if ((k.idx - j.ramp + N) % N < 30) idx = (j.ramp - 10 + N) % N;
+  if (idx - k.idx > N / 2) k.lap--; // zurück über die Ziellinie gesetzt
+  const p = path[idx];
+  k.x = p.x; k.y = p.y; k.a = k.moveA = p.ang; k.speed = 0; k.spin = 0;
+  k.idx = idx; k.progress = k.lap * N + idx;
 }
 
 function spinOut(k) {
@@ -1476,8 +1634,12 @@ function render() {
     if (Math.abs(rel) > 2.4) im = k.spr.front;
     else if (Math.abs(rel) > 0.7) { im = k.spr.side; flip = rel < 0; }
     else rot = clamp(rel * 0.6, -0.3, 0.3);
-    const w = im.width / SS / PXU * s.sc * (k.small > 0 ? 0.55 : 1), h = w * im.height / im.width;
-    const lift = k.hop > 0 ? Math.sin((0.25 - k.hop) / 0.25 * Math.PI) * 2.5 * s.sc : 0;
+    const fallScale = k.fall > 0 ? Math.max(0.1, k.fall / 1.3) : 1; // beim Absturz verschwindet das Kart in der Tiefe
+    const w = im.width / SS / PXU * s.sc * (k.small > 0 ? 0.55 : 1) * fallScale, h = w * im.height / im.width;
+    const lift = (k.hop > 0 ? Math.sin((0.25 - k.hop) / 0.25 * Math.PI) * 2.5 : 0) * s.sc + (k.z || 0) * s.sc;
+    if ((k.z || 0) > 0.5) { // Schatten bleibt am Boden
+      vctx.fillStyle = 'rgba(0,0,0,.3)'; vctx.beginPath(); vctx.ellipse(s.sx, s.sy - 0.5 * s.sc, w * 0.42, w * 0.08, 0, 0, 7); vctx.fill();
+    }
     vctx.save(); vctx.translate(s.sx, s.sy - lift); vctx.rotate(rot); if (flip) vctx.scale(-1, 1);
     vctx.drawImage(im, -w / 2, -h, w, h);
     vctx.restore();
@@ -1582,7 +1744,7 @@ function drawScreens() {
     lines.forEach((l, i) => txt(l, OW / 2, 222 + i * 34, 22, 'center', '#e8f2ff'));
     const h = hostPeer(), host = amHost();
     // Streckenwahl
-    txt(`${host ? '◀  ' : ''}Strecke ${trackIdx + 1}/${TRACKS.length}: ${TRACKS[trackIdx].name}${host ? '  ▶' : ''}`, OW / 2, 340, 34, 'center', '#ffffff');
+    txt(`${host ? '◀  ' : ''}Strecke ${trackIdx + 1}/${TRACKS.length}: ${TRACKS[trackIdx].name}${TRACKS[trackIdx].hard ? ' ★' : ''}${host ? '  ▶' : ''}`, OW / 2, 340, 34, 'center', TRACKS[trackIdx].hard ? '#ffb347' : '#ffffff');
     txt(host ? (touchMode ? '(Zeile links/rechts antippen zum Wechseln)' : '(← → Strecke     ↑ ↓ Stärke der Bots)') : '(der Host wählt Strecke und Bots)', OW / 2, 364, 18, 'center', '#c8d4e4');
     const BL = BOT_LEVELS[botLevel];
     txt(`${host ? '◀  ' : ''}Bots: ${BL.name}${host ? '  ▶' : ''}`, OW / 2, 404, 30, 'center', BL.col);
