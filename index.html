@@ -107,7 +107,7 @@ const HORIZON = Math.round(70 * RS); // Bildschirmzeile des Horizonts
 const FOCAL = 220 * RS;          // Brennweite der Kamera
 const SS = 4;                    // Sprites werden 4-fach so fein gezeichnet
 const CAM_H = 20, CAM_DIST = 48; // Kamerahöhe und Abstand hinter dem Kart
-const LAPS = 3;
+const lapsNow = () => (track && track.laps) || 3; // Rundenzahl der aktuellen Strecke
 
 const ACC = 95, BRAKE = 180, FRICTION = 40, TURN = 2.1, OFFROAD_MAX = 55;
 
@@ -184,6 +184,22 @@ const TRACKS = [
     ctrl: [[857,792],[900,315],[1080,277],[1163,738],[1469,596],[1657,764],[1632,1004],[1758,1300],[1328,1324],[1299,1516],[1066,1573],[887,1420],[663,1487],[316,1471],[398,1156],[238,748],[733,830]] },
   { name: 'Vulkanschlund', theme: 'volcano', size: 2048, road: 70, hard: true, jumps: 3, gap: 6,
     ctrl: [[1506,1454],[1204,1426],[1075,1824],[851,1764],[664,1438],[352,1289],[446,1041],[545,786],[840,816],[724,280],[976,198],[1142,700],[1424,526],[1734,638],[1545,926],[1668,1252]] },
+  // Nordschleife des Nürburgrings – Verlauf aus OpenStreetMap-Daten (© OpenStreetMap-Mitwirkende, ODbL),
+  // maßstabsgetreu verkleinert (20,8 km) und leicht geglättet, damit Karts die engsten Ecken schaffen.
+  // T13 > Hatzenbach > Flugplatz > Fuchsröhre > Adenauer Forst > Breidscheid > Bergwerk > Kesselchen >
+  // Karussell > Hohe Acht > Brünnchen > Pflanzgarten > Schwalbenschwanz > Döttinger Höhe.
+  { name: 'Nordschleife', theme: 'eifel', size: 2560, road: 60, hard: true, credit: 'Streckenverlauf: © OpenStreetMap-Mitwirkende (ODbL)',
+    hills: [[269, 1889], [2220, 1130]], // Flugplatz-Kuppe und Sprunghügel am Pflanzgarten
+    ctrl: [
+      [945,2184],[901,2189],[854,2192],[802,2197],[746,2198],[688,2192],[630,2175],[575,2148],[522,2114],[470,2076],[420,2033],[373,1988],[332,1937],[301,1882],
+      [283,1822],[274,1758],[269,1692],[261,1626],[245,1560],[221,1499],[193,1442],[170,1392],[161,1347],[173,1305],[204,1264],[246,1220],[291,1172],[330,1119],
+      [363,1063],[393,1006],[423,951],[457,897],[492,844],[521,792],[536,740],[537,690],[532,644],[534,600],[551,561],[584,530],[629,511],[681,505],
+      [736,506],[793,505],[849,496],[903,477],[957,452],[1012,425],[1068,402],[1123,388],[1171,388],[1209,408],[1240,444],[1271,490],[1309,534],[1358,570],
+      [1417,595],[1481,613],[1547,630],[1612,646],[1676,661],[1738,668],[1799,664],[1857,654],[1906,645],[1940,645],[1958,657],[1967,672],[1979,680],[2004,674],
+      [2043,654],[2088,624],[2135,591],[2181,566],[2230,556],[2279,565],[2326,592],[2365,631],[2395,678],[2415,727],[2423,774],[2418,817],[2397,858],[2367,901],
+      [2336,948],[2307,1001],[2277,1055],[2243,1107],[2202,1157],[2155,1202],[2103,1242],[2047,1272],[1988,1294],[1933,1309],[1890,1324],[1866,1346],[1863,1377],[1873,1416],
+      [1879,1459],[1870,1504],[1840,1547],[1794,1587],[1738,1625],[1680,1662],[1620,1698],[1560,1735],[1501,1772],[1441,1809],[1382,1846],[1324,1885],[1267,1925],[1213,1968],
+      [1162,2014],[1115,2062],[1071,2108],[1028,2146],[986,2171]] },
   { name: 'Regenbogen-Ring', theme: 'rainbow', size: 2048, road: 70, hard: true, jumps: 2,
     ctrl: [[1619,747],[1646,924],[1681,1279],[1261,1232],[1341,1701],[1080,1791],[853,1534],[779,1302],[531,1366],[246,1135],[631,882],[755,812],[731,342],[1000,220],[1194,323],[1181,809]] },
 ];
@@ -217,6 +233,8 @@ const THEMES = {
              outside: '#6f6f78', sky: ['#000005', '#1b1f3a'], mtn: ['#9a9aa6', '#77778a', '#55556a'], trees: ['rock', 'crystal'], stars: true, gap: 'chasm' },
   castle:  { grass: ['#4a4448', '#433e42'], border: '#2a2528', road: '#6a6470', curb: ['#e0c060', '#5a1a1a'], line: 'rgba(255,220,120,.5)',
              outside: '#2a2026', sky: ['#2a1030', '#a0405a'], mtn: ['#3a2a3a', '#2a1f2c', '#1a1420'], trees: ['lavarock', 'rock'], stars: true, gap: 'lava' },
+  eifel:   { grass: ['#3f8c3a', '#378034'], border: '#9c9a8c', road: '#58585f', curb: ['#ffffff', '#d32f2f'], line: 'rgba(255,255,255,.55)',
+             outside: '#2c6b2c', sky: ['#5b8fc9', '#d9e6ef'], mtn: ['#5f8a68', '#3f6e48', '#2c5a34'], trees: ['pine', 'pine', 'tree'], clouds: true },
   // Regenbogen-Ring: keine Randstreifen – wer von der Fahrbahn abkommt, fällt ins All
   rainbow: { grass: ['#05030f', '#080616'], border: '#05030f', road: 'rainbow', curb: ['#ffffff', '#ff4fd8'], line: 'rgba(255,255,255,.7)',
              outside: '#020108', sky: ['#000000', '#1a0b3a'], mtn: ['#2a1a5a', '#1c1240', '#120b2a'], trees: ['crystal'], stars: true, gap: 'void', voidOff: true },
@@ -355,6 +373,19 @@ function stripPoly(g, i0, i1, half) {
 const GAP_LOOK = { chasm: ['#0b0910', '#3a3440'], water: ['#1565c0', '#8fd0ff'], lava: ['#d84315', '#ffc23a'], void: ['#000000', '#5a2aa0'] };
 function drawJumps(g, forMask) {
   for (const j of jumps) {
+    if (j.hill) { // Kuppe: hellerer Asphalt mit weißen Pfeilen, man hebt kurz ab
+      stripPoly(g, j.ramp, j.at, ROAD / 2 + 6);
+      if (forMask) { g.fillStyle = '#00f'; g.fill(); continue; }
+      g.fillStyle = 'rgba(255,255,255,.18)'; g.fill();
+      g.fillStyle = 'rgba(255,255,255,.75)';
+      const q = path[(j.at - 1 + N) % N];
+      for (let lat = -ROAD / 2 + 12; lat <= ROAD / 2 - 12; lat += 20) {
+        g.save(); g.translate(q.x + q.nx * lat, q.y + q.ny * lat); g.rotate(q.ang);
+        g.beginPath(); g.moveTo(-4, -7); g.lineTo(4, 0); g.lineTo(-4, 7); g.lineTo(-1, 0); g.closePath(); g.fill();
+        g.restore();
+      }
+      continue;
+    }
     // Abgrund, breiter als die Straße, damit man nicht drumherum fahren kann
     stripPoly(g, j.gap0, j.gap1, ROAD / 2 + 45); // nicht breiter, sonst reicht er bis zu benachbarten Streckenteilen
     if (forMask) { g.fillStyle = '#f0f'; g.fill(); }
@@ -412,6 +443,12 @@ function buildTrack(i) {
     }
     jumps.sort((a, b) => a.at - b.at);
   }
+  // Sprunghügel ohne Abgrund (z. B. Flugplatz und Pflanzgarten auf der Nordschleife)
+  for (const [hx, hy] of track.hills || []) {
+    let at = 0, bd = Infinity;
+    path.forEach((q, i) => { const d = (q.x - hx) ** 2 + (q.y - hy) ** 2; if (d < bd) { bd = d; at = i; } });
+    jumps.push({ at, ramp: at - 2, hill: true });
+  }
   const nearJump = (i, d) => jumps.some(j => Math.min(Math.abs(i - j.at), N - Math.abs(i - j.at)) < d);
 
   // Boost-Felder auf den geradesten Abschnitten (mehr auf langen Strecken)
@@ -432,7 +469,7 @@ function buildTrack(i) {
     let md = Infinity;
     for (const p of path) { const d = (p.x - x) ** 2 + (p.y - y) ** 2; if (d < md) md = d; }
     if (md < (ROAD / 2 + 45) ** 2) continue;
-    if (jumps.some(j => { for (let i = j.gap0 - 2; i <= j.gap1 + 2; i++) { const q = path[i % N]; if ((q.x - x) ** 2 + (q.y - y) ** 2 < (ROAD / 2 + 100) ** 2) return true; } return false; })) continue;
+    if (jumps.some(j => { if (j.hill) return false; for (let i = j.gap0 - 2; i <= j.gap1 + 2; i++) { const q = path[i % N]; if ((q.x - x) ** 2 + (q.y - y) ** 2 < (ROAD / 2 + 100) ** 2) return true; } return false; })) continue;
     if (trees.some(t => (t.x - x) ** 2 + (t.y - y) ** 2 < 42 ** 2)) continue;
     trees.push({ x, y, s: decoSprite(theme.trees[Math.floor(rnd() * theme.trees.length)]) });
   }
@@ -530,7 +567,7 @@ function buildTrack(i) {
   mm.lineWidth = ROAD * mmS; mm.strokeStyle = '#eee'; mm.stroke();
   const p0 = path[0];
   mm.fillStyle = '#111'; mm.beginPath(); mm.arc(p0.x * mmS, p0.y * mmS, 3, 0, 7); mm.fill();
-  for (const j of jumps) { // Abgründe als Querbalken auf der Minikarte
+  for (const j of jumps.filter(j => !j.hill)) { // Abgründe als Querbalken auf der Minikarte
     const q = path[(j.gap0 + 2) % N], h = (ROAD / 2 + 30) * mmS;
     mm.strokeStyle = theme.gap === 'lava' ? '#ff5a1f' : theme.gap === 'water' ? '#2f8fff' : '#c04dff'; mm.lineWidth = 4;
     mm.beginPath(); mm.moveTo((q.x + q.nx * h / mmS) * mmS, (q.y + q.ny * h / mmS) * mmS); mm.lineTo((q.x - q.nx * h / mmS) * mmS, (q.y - q.ny * h / mmS) * mmS); mm.stroke();
@@ -1168,7 +1205,8 @@ function updateKart(k, inp, dt) {
   else if (k.onRamp) {
     k.onRamp = false;
     if (k.speed > 40) {
-      k.airT = k.air = 0.3 + k.speed / 350; k.drifting = false;
+      const hill = jumps.some(j => j.hill && Math.min(Math.abs(k.idx - j.at), N - Math.abs(k.idx - j.at)) < 8);
+      k.airT = k.air = hill ? 0.15 + k.speed / 700 : 0.3 + k.speed / 350; k.drifting = false;
       if (k.isPlayer) beep(520, 0.25, 'triangle', 0.06);
     }
   }
@@ -1262,11 +1300,11 @@ function updateProgress(k) {
   const diff = best - k.idx;
   if (diff < -N / 2) {
     k.lap++;
-    if (k.lap > LAPS && !k.finished) {
+    if (k.lap > lapsNow() && !k.finished) {
       k.finished = true; k.finishTime = raceTime;
     } else if (k.isPlayer && k.lap >= 2) {
-      msg = k.lap === LAPS ? 'LETZTE RUNDE!' : 'RUNDE ' + k.lap; msgT = 2;
-      beep(k.lap === LAPS ? 990 : 770, 0.35, 'triangle', 0.1);
+      msg = k.lap === lapsNow() ? 'LETZTE RUNDE!' : 'RUNDE ' + k.lap; msgT = 2;
+      beep(k.lap === lapsNow() ? 990 : 770, 0.35, 'triangle', 0.1);
     }
   } else if (diff > N / 2) k.lap--;
   k.idx = best;
@@ -1407,7 +1445,7 @@ function startFall(k) {
 // nach einem Absturz: vor der Schanze (oder knapp hinter der Absturzstelle) mit Tempo 0 wieder einsetzen
 function respawnKart(k) {
   let idx = (k.idx - 4 + N) % N;
-  for (const j of jumps) if ((k.idx - j.ramp + N) % N < 30) idx = (j.ramp - 10 + N) % N;
+  for (const j of jumps) if (!j.hill && (k.idx - j.ramp + N) % N < 30) idx = (j.ramp - 10 + N) % N;
   if (idx - k.idx > N / 2) k.lap--; // zurück über die Ziellinie gesetzt
   const p = path[idx];
   k.x = p.x; k.y = p.y; k.a = k.moveA = p.ang; k.speed = 0; k.spin = 0;
@@ -1733,7 +1771,7 @@ function drawScreens() {
   if (state === 'menu') {
     ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(0, 0, OW, OH);
     txt('KART RACER', OW / 2, 120, 100, 'center', '#ffd23f');
-    txt('3 Runden, bis zu 8 Spieler – freie Plätze fahren Bots', OW / 2, 172, 26, 'center');
+    txt(`${lapsNow()} Runden, bis zu 8 Spieler – freie Plätze fahren Bots`, OW / 2, 172, 26, 'center');
     const lines = touchMode
       ? ['Gas gibt das Kart von selbst: ◀ ganz links und ▶ ganz rechts lenken',
          'DRIFT (neben den Pfeilen) halten + lenken, loslassen = Turbo',
@@ -1746,6 +1784,7 @@ function drawScreens() {
     // Streckenwahl
     txt(`${host ? '◀  ' : ''}Strecke ${trackIdx + 1}/${TRACKS.length}: ${TRACKS[trackIdx].name}${TRACKS[trackIdx].hard ? ' ★' : ''}${host ? '  ▶' : ''}`, OW / 2, 340, 34, 'center', TRACKS[trackIdx].hard ? '#ffb347' : '#ffffff');
     txt(host ? (touchMode ? '(Zeile links/rechts antippen zum Wechseln)' : '(← → Strecke     ↑ ↓ Stärke der Bots)') : '(der Host wählt Strecke und Bots)', OW / 2, 364, 18, 'center', '#c8d4e4');
+    if (TRACKS[trackIdx].credit) txt(TRACKS[trackIdx].credit, OW - 20, 26, 15, 'right', '#c8d4e4'); // Quellenangabe
     const BL = BOT_LEVELS[botLevel];
     txt(`${host ? '◀  ' : ''}Bots: ${BL.name}${host ? '  ▶' : ''}`, OW / 2, 404, 30, 'center', BL.col);
     if (builtTrack === trackIdx && !touchMode) { // am Handy steht hier das Raum-Panel
@@ -1782,7 +1821,7 @@ function drawScreens() {
 
   const rank = ranking(), pos = rank.indexOf(player) + 1;
   // Runde und Zeit
-  txt(`RUNDE ${clamp(player.lap, 1, LAPS)}/${LAPS}`, 30, 62, 46);
+  txt(`RUNDE ${clamp(player.lap, 1, lapsNow())}/${lapsNow()}`, 30, 62, 46);
   txt(fmtTime(player.finished ? player.finishTime : raceTime), 30, 108, 34, 'left', '#ffe9a0');
   // Geschwindigkeit + Drift-Anzeige
   // auf dem Handy liegen unten die Touch-Knöpfe, deshalb wandern Tempo und Platz nach oben
